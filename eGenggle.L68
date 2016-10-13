@@ -1,0 +1,3010 @@
+00000000 Starting Address
+Assembler used: EASy68K Editor/Assembler v5.15.04
+Created On: 10/13/2016 7:35:18 PM
+
+00000000                             1  *-----------------------------------------------------------
+00000000                             2  * Title      : eGenggle
+00000000                             3  * Written by : Martin Holtkamp
+00000000                             4  * Date       : 10/14/2016
+00000000                             5  * Description: A port of the game Genggle from genesis to 
+00000000                             6  *              to Easy68k. Use left/right to aim ball and 
+00000000                             7  *              press Z to fire the ball. Hit all red pegs 
+00000000                             8  *              to clear a level. The fewer red pegs that 
+00000000                             9  *              remain, the higher the score of hitting a 
+00000000                            10  *              blue peg.
+00000000                            11  *-----------------------------------------------------------
+00000000                            12  
+00000000                            13  START:                  ; first instruction of program
+00000000                            14      ORG 0 
+00000000  4EF9 00013266             15      jmp EntryPoint 
+00000006                            16      
+00000006                            17      ; Consts include 
+00000006                            18      INCLUDE "source/constants.asm"
+00000006  =25275A0D                 19  KEY_LIST EQU $25275A0D
+00000006  =00000013                 20  KEYBOARD_INPUT_TRAP_CODE EQU 19
+00000006                            21  
+00000006  =00000000                 22  BUTTON_UP    EQU $0 
+00000006  =00000001                 23  BUTTON_DOWN  EQU $1 
+00000006  =00000002                 24  BUTTON_LEFT  EQU $2 
+00000006  =00000003                 25  BUTTON_RIGHT EQU $3 
+00000006  =0000000C                 26  BUTTON_A     EQU $C
+00000006  =00000004                 27  BUTTON_B     EQU $4 
+00000006  =00000005                 28  BUTTON_C     EQU $5 
+00000006  =0000000D                 29  BUTTON_START EQU $D
+00000006                            30  
+00000006  =00000100                 31  TO_FIXED EQU 256
+00000006                            32  
+00000006  =00000140                 33  SCREEN_WIDTH EQU 320
+00000006  =000000E0                 34  SCREEN_HEIGHT EQU 224
+00000006                            35  
+00000006  =000001A1                 36  RAND_MULTIPLIER EQU 417
+00000006  =00000929                 37  RAND_ADDER EQU 2345
+00000006                            38  
+00000006                            39  ; Game consts 
+00000006  =00009A00                 40  AIM_CENTER_X EQU 154*TO_FIXED
+00000006  =00000500                 41  AIM_CENTER_Y EQU 5*TO_FIXED 
+00000006  =00001E00                 42  AIM_RADIUS EQU 30*TO_FIXED 
+00000006  =00005A00                 43  AIM_START_ANGLE EQU 90*TO_FIXED
+00000006  =00000200                 44  AIM_ANGLE_DELTA EQU 2*TO_FIXED
+00000006  =00000500                 45  AIM_ANGLE_MIN EQU 5*TO_FIXED
+00000006  =0000AF00                 46  AIM_ANGLE_MAX EQU 175*TO_FIXED
+00000006                            47  
+00000006  =00000400                 48  LAUNCH_SPEED EQU 4*TO_FIXED 
+00000006  =00000012                 49  GRAVITY EQU 18
+00000006  =0000E000                 50  FALLOUT_Y EQU 224*TO_FIXED
+00000006  =00000000                 51  LEFT_BOUND EQU 0*TO_FIXED
+00000006  =00013800                 52  RIGHT_BOUND SET (320*TO_FIXED)-BALL_WIDTH
+00000006                            53  
+00000006  =00000001                 54  BALLS_STRING_X EQU 1 
+00000006  =00000000                 55  BALLS_STRING_Y EQU 0
+00000006                            56  
+00000006  =0000001D                 57  SCORE_STRING_X EQU 29 
+00000006  =00000000                 58  SCORE_STRING_Y EQU 0 
+00000006                            59  
+00000006  =00000002                 60  SAVE_STRING_X EQU 2 
+00000006  =00000002                 61  SAVE_STRING_Y EQU 2 
+00000006                            62   
+00000006                            63  ; Game states 
+00000006  =00000000                 64  STATE_START   EQU 0 
+00000006  =00000001                 65  STATE_AIM     EQU 1 
+00000006  =00000002                 66  STATE_RESOLVE EQU 2 
+00000006  =00000003                 67  STATE_LOSE    EQU 3 
+00000006  =00000004                 68  STATE_WIN     EQU 4 
+00000006                            69  
+00000006                            70  ; Genggle Data sizes 
+00000006  =00000020                 71  PEG_DATA_SIZE    EQU 32 
+00000006  =00000020                 72  BALL_DATA_SIZE   EQU 32 
+00000006  =00000020                 73  SAVER_DATA_SIZE  EQU 32 
+00000006                            74  
+00000006                            75  ; Shift values for multiplying 
+00000006  =00000005                 76  PEG_SIZE_SHIFT   EQU 5 
+00000006  =00000005                 77  BALL_SIZE_SHIFT  EQU 5 
+00000006  =00000005                 78  SAVER_SIZE_SHIFT EQU 5 
+00000006                            79  
+00000006                            80  ; Game consts 
+00000006  =0000001E                 81  MAX_PEGS EQU 30 
+00000006  =00000020                 82  MAX_GENGGLE_SPRITES EQU 32
+00000006  =00000014                 83  SPRITE_DISABLE_X EQU 20 
+00000006  =00000014                 84  SPRITE_DISABLE_Y EQU 20 
+00000006                            85  
+00000006  =00000800                 86  BALL_WIDTH EQU 8*TO_FIXED 
+00000006  =00000800                 87  BALL_HEIGHT EQU 8*TO_FIXED
+00000006  =00000043                 88  BALL_PATTERN EQU 67
+00000006                            89  
+00000006  =FFFF9400                 90  PEG_INIT_X EQU -108*TO_FIXED
+00000006  =FFFF9400                 91  PEG_INIT_Y EQU -108*TO_FIXED
+00000006  =00000800                 92  PEG_WIDTH  EQU 8*TO_FIXED
+00000006  =00000800                 93  PEG_HEIGHT EQU 8*TO_FIXED
+00000006  =00000001                 94  PEG_PALETTE EQU 1
+00000006                            95  
+00000006  =00000000                 96  PEG_TYPE_BLUE   EQU 0 
+00000006  =00000001                 97  PEG_TYPE_RED    EQU 1 
+00000006  =00000002                 98  PEG_TYPE_PURPLE EQU 2 
+00000006                            99  
+00000006  =00001400                100  SAVER_INIT_X EQU 20*TO_FIXED 
+00000006  =0000D400                101  SAVER_INIT_Y EQU 212*TO_FIXED 
+00000006  =00002000                102  SAVER_WIDTH EQU 32*TO_FIXED 
+00000006  =00000800                103  SAVER_HEIGHT EQU 8*TO_FIXED
+00000006  =00000200                104  SAVER_XVEL EQU 2*TO_FIXED
+00000006  =00000000                105  SAVER_RECT_OFFSET_X EQU 0 
+00000006  =00000008                106  SAVER_RECT_OFFSET_Y EQU 8 
+00000006  =00000000                107  SAVER_LEFT_BOUND EQU 0*TO_FIXED
+00000006  =00012000                108  SAVER_RIGHT_BOUND EQU 288*TO_FIXED
+00000006                           109  
+00000006  =00000000                110  BALL_SPRITE_INDEX  EQU 0 
+00000006  =00000001                111  SAVER_SPRITE_INDEX EQU 1 
+00000006  =00000002                112  PEGS_SPRITE_INDEX  EQU 2 
+00000006                           113  
+00000006  =00000008                114  NUM_LEVELS EQU 8 
+00000006                           115  
+00000006  =00000000                116  LEVEL_PEG_COUNT_OFFSET     EQU 0 
+00000006  =00000004                117  LEVEL_RED_PEG_COUNT_OFFSET EQU 4 
+00000006  =00000008                118  LEVEL_BALL_COUNT_OFFSET    EQU 8 
+00000006  =0000000C                119  LEVEL_PEGS_OFFSET          EQU 12 
+00000006                           120  
+00000006  =00000080                121  MAX_SQRT_INPUT EQU 128
+00000006  =000000E0                122  DAMPENING_COEFFICIENT EQU $e0
+00000006                           123  
+00000006  =00000002                124  RED_PEG_SCORE EQU 2 
+00000006  =00000004                125  BLUE_PEG_LOW_SCORE  EQU 4 
+00000006  =00000002                126  BLUE_PEG_MID_SCORE  EQU 2 
+00000006  =00000001                127  BLUE_PEG_HIGH_SCORE EQU 1
+00000006  =00000002                128  LOW_RED EQU 2 
+00000006  =00000006                129  MID_RED EQU 6
+00000006  =00000020                130  HIGH_RED EQU 32 
+00000006  =00000020                131  -------------------- end include --------------------
+00000006                           132      
+00000006                           133      ; BSS data  
+00000006                           134      INCLUDE "source/bss.asm"
+00000006                           135  Pegs:
+00000006                           136      ds.b MAX_PEGS*PEG_DATA_SIZE
+000003C6                           137      
+000003C6                           138  Ball:
+000003C6                           139      ds.b BALL_DATA_SIZE
+000003E6                           140      
+000003E6                           141  Saver:
+000003E6                           142      ds.b SAVER_DATA_SIZE 
+00000406                           143  
+00000406                           144  ; All global variables are assumed to be longs even if not
+00000406                           145  ; used as such in the program.
+00000406                           146  ButtonsDown:
+00000406                           147      ds.l 1  
+0000040A                           148  GameState:
+0000040A                           149      ds.l 1
+0000040E                           150  VblankFlag:
+0000040E                           151      ds.l 1
+00000412                           152  AimAngle:
+00000412                           153      ds.l 1
+00000416                           154  Level:
+00000416                           155      ds.l 1
+0000041A                           156  BallCount:
+0000041A                           157      ds.l 1
+0000041E                           158  LevelPegCount:
+0000041E                           159      ds.l 1
+00000422                           160  LevelRedPegCount:
+00000422                           161      ds.l 1
+00000426                           162  LevelBallCount:
+00000426                           163      ds.l 1
+0000042A                           164  RandVal:
+0000042A                           165      ds.l 1
+0000042E                           166  FrameCounter:
+0000042E                           167      ds.l 1
+00000432                           168  RedPegCount:
+00000432                           169      ds.l 1
+00000436                           170  PegCount:
+00000436                           171      ds.l 1
+0000043A                           172  Score:
+0000043A                           173      ds.l 1
+0000043A                           174  -------------------- end include --------------------
+0000043E                           175      
+0000043E                           176      ; CODE includes 
+0000043E                           177      INCLUDE "source/util.asm"
+0000043E  =0000000A                178  BITMAP_PIXEL_ARRAY_OFF_OFFSET EQU 10
+0000043E  =00000012                179  BITMAP_WIDTH_OFFSET           EQU 18 
+0000043E  =00000016                180  BITMAP_HEIGHT_OFFSET          EQU 22 
+0000043E  =0000001C                181  BITMAP_BPP_OFFSET             EQU 28
+0000043E  =00000036                182  BITMAP_HEADER_SIZE            EQU 54
+0000043E                           183  
+0000043E  =00000004                184  REQUIRED_BITS_PER_PIXEL EQU 4 
+0000043E                           185   
+0000043E  =00000050                186  IO_TASK_PEN_COLOR  EQU 80
+0000043E  =00000052                187  IO_TASK_DRAW_PIXEL EQU 82
+0000043E                           188  
+0000043E                           189  ; ------ SUBROUTINE ------
+0000043E                           190  ; SeedRandom
+0000043E                           191  ;
+0000043E                           192  ; Seeds the random number generator with 
+0000043E                           193  ; a given word 
+0000043E                           194  ; 
+0000043E                           195  ; Input:
+0000043E                           196  ;   d0.w = seed 
+0000043E                           197  ; ------------------------  
+0000043E                           198  SeedRandom:
+0000043E  31C0 042A                199      move.w d0, RandVal
+00000442  4E75                     200      rts 
+00000444                           201      
+00000444                           202  ; ------ SUBROUTINE ------
+00000444                           203  ; Random
+00000444                           204  ;
+00000444                           205  ; Returns a byte between
+00000444                           206  ; 
+00000444                           207  ; Output:
+00000444                           208  ;   d0.b = random value (0-255)
+00000444                           209  ; ------------------------  
+00000444                           210  Random:
+00000444                           211      ; Multiply some magic number 
+00000444  3038 042A                212      move.w RandVal, d0 
+00000448  323C 01A1                213      move.w #RAND_MULTIPLIER, d1 
+0000044C  C0C1                     214      mulu d1, d0 
+0000044E                           215      
+0000044E                           216      ; Add some magic number 
+0000044E  0640 0929                217      addi.w #RAND_ADDER, d0 
+00000452                           218      
+00000452                           219      ; Save this as the new random value
+00000452  31C0 042A                220      move.w d0, RandVal
+00000456                           221      
+00000456                           222      ; d0.b will contain a random number 
+00000456                           223      ; but mask away other bytes just for safety 
+00000456  0280 000000FF            224      andi.l #$000000ff, d0 
+0000045C                           225      
+0000045C  4E75                     226      rts 
+0000045E                           227  
+0000045E                           228  ; ------ SUBROUTINE ------
+0000045E                           229  ; UpdateButtons
+0000045E                           230  ;
+0000045E                           231  ; Grabs the state of buttons from the controller.
+0000045E                           232  ; This subroutine places the updated values in the ButtonsDown
+0000045E                           233  ; word in BSS memory. Status of an individual button can be
+0000045E                           234  ; checked by using btst.w #BUTTON_X, ButtonsDown
+0000045E                           235  ; If the bit is set, then that button is down.
+0000045E                           236  ; If cleared, then that button is up.
+0000045E                           237  ; ------------------------
+0000045E                           238  UpdateButtons:
+0000045E  4280                     239      clr.l d0 
+00000460  223C 25275A0D            240      move.l #KEY_LIST, d1 
+00000466  7013                     241      move.l #KEYBOARD_INPUT_TRAP_CODE, d0 
+00000468  4E4F                     242      trap #15 
+0000046A                           243      
+0000046A  74FF                     244      move.l #$ffffffff, d2
+0000046C                           245      
+0000046C  0801 0018                246      btst.l #24, d1
+00000470  6700 0006                247      beq .check_right 
+00000474  0882 0002                248      bclr.l #BUTTON_LEFT, d2 
+00000478                           249      
+00000478                           250  .check_right 
+00000478  0801 0010                251      btst.l #16, d1 
+0000047C  6700 0006                252      beq .check_z
+00000480  0882 0003                253      bclr.l #BUTTON_RIGHT, d2 
+00000484                           254      
+00000484                           255  .check_z
+00000484  0801 0008                256      btst.l #8, d1 
+00000488  6700 0006                257      beq .check_start 
+0000048C  0882 000C                258      bclr.l #BUTTON_A, d2 
+00000490                           259      
+00000490                           260  .check_start 
+00000490  0801 0000                261      btst.l #0, d1 
+00000494  6700 0006                262      beq .save_keys 
+00000498  0882 000D                263      bclr.l #BUTTON_START, d2 
+0000049C                           264      
+0000049C                           265  .save_keys 
+0000049C                           266  
+0000049C  31C2 0406                267      move.w d2, ButtonsDown
+000004A0                           268      
+000004A0  4E75                     269      rts 
+000004A2                           270      
+000004A2                           271      
+000004A2                           272  ;------ SUBROUTINE -------
+000004A2                           273  ; RenderBitmap16
+000004A2                           274  ; Input:
+000004A2                           275  ;   a0.l: pointer to bitmap file data 
+000004A2                           276  ;   d0.l: bitmap chunk x position
+000004A2                           277  ;   d1.l: bitmap chunk y position 
+000004A2                           278  ;   d2.l: bitmap chunk width 
+000004A2                           279  ;   d3.l: bitmap chunk height 
+000004A2                           280  ;   d4.l: render x position 
+000004A2                           281  ;   d5.l: render y position 
+000004A2                           282  ;-------------------------
+000004A2                           283  RenderBitmap16:
+000004A2                           284  
+000004A2                           285          ; Save subroutine arguments to system memory for recall later 
+000004A2  23C8 0000069A            286          move.l a0, bitmap_addr 
+000004A8  23C0 000006A2            287          move.l d0, chunk_x 
+000004AE  23C1 000006AA            288          move.l d1, chunk_y 
+000004B4  23C2 000006B2            289          move.l d2, chunk_width 
+000004BA  23C3 000006BA            290          move.l d3, chunk_height 
+000004C0  23C4 000006C2            291          move.l d4, render_x
+000004C6  23C5 000006CA            292          move.l d5, render_y
+000004CC                           293         
+000004CC                           294          ; Examine the bitmap file header, and save important addresses/values
+000004CC  2028 0012                295          move.l BITMAP_WIDTH_OFFSET(a0), d0 
+000004D0  4EB9 000006FE            296          jsr EndianSwap_L
+000004D6  23C0 000006D2            297          move.l d0, bitmap_width  
+000004DC                           298          
+000004DC  2028 0016                299          move.l BITMAP_HEIGHT_OFFSET(a0), d0 
+000004E0  4EB9 000006FE            300          jsr EndianSwap_L
+000004E6  23C0 000006DA            301          move.l d0, bitmap_height 
+000004EC                           302          
+000004EC  3028 001C                303          move.w BITMAP_BPP_OFFSET(a0), d0 
+000004F0  4EB9 00000706            304          jsr EndianSwap_W 
+000004F6  33C0 000006E2            305          move.w d0, bitmap_bpp
+000004FC                           306           
+000004FC                           307          ; Find the pixel array address based on the offset given in the header
+000004FC  2028 000A                308          move.l BITMAP_PIXEL_ARRAY_OFF_OFFSET(a0), d0    ; d0 = offset in bytes from start of file to pixel array
+00000500  4EB9 000006FE            309          jsr EndianSwap_L                                ; correct endianness 
+00000506  2248                     310          movea.l a0, a1                                  ; a1 = address of the bitmap file 
+00000508  D3C0                     311          add.l d0, a1                                    ; a1 = address of the color table 
+0000050A  23C9 000006EE            312          move.l a1, pixel_array_addr                     ; store the address in memory 
+00000510                           313          
+00000510                           314          ; Find the color table address. It immediately follows the header.
+00000510  2248                     315          movea.l a0, a1                                  ; a1 = address of bitmap file 
+00000512  D3FC 00000036            316          adda.l #BITMAP_HEADER_SIZE, a1                  ; a1 = address of color table 
+00000518  23C9 000006E6            317          move.l a1, color_table_addr                     ; store the address in memory
+0000051E                           318          
+0000051E                           319          ; Examine the bits per pixel word to see if this bmp
+0000051E                           320          ; truly is a 16 color paletted bitmap (4bpp).
+0000051E  3039 000006E2            321          move.w bitmap_bpp, d0
+00000524  0C40 0004                322          cmpi.w #REQUIRED_BITS_PER_PIXEL, d0  ; is this bitmap's bitdepth 4?
+00000528  6600 016E                323          bne .return                          ; if not, return and do not attempt to render.
+0000052C                           324          
+0000052C                           325          ; Determine the number of nibbles to pad row with.
+0000052C                           326          ; In the pixel array, the end of each row must be 4-byte aligned
+0000052C  2039 000006D2            327          move.l  bitmap_width, d0               ; d0 = bitmap width 
+00000532  E288                     328          lsr.l #1, d0                           ; d0 = bitmap width (bytes)
+00000534  5680                     329          addq.l #3, d0                          ; add 3 to offset one long if not long aligned 
+00000536  0280 FFFFFFFC            330          andi.l #$fffffffc, d0                  ; snap to the long word boundary
+0000053C  23C0 000006F6            331          move.l d0, bitmap_width_bytes
+00000542                           332          
+00000542                           333          ; Check for valid chunk_x
+00000542  2039 000006A2            334          move.l chunk_x, d0 
+00000548  2239 000006D2            335          move.l bitmap_width, d1 
+0000054E  B280                     336          cmp.l d0, d1                    ; is the bitmap width bigger than chunk_x?
+00000550  6300 0146                337          bls .return                     ; if so, return. chunk_x is outside of image. nothing to draw. 
+00000554                           338          
+00000554                           339          ; Check for valid chunk_y
+00000554  2039 000006AA            340          move.l chunk_y, d0 
+0000055A  2239 000006DA            341          move.l bitmap_height, d1 
+00000560  B280                     342          cmp.l d0, d1                    ; is the bitmap height bigger than chunk_y?
+00000562  6300 0134                343          bls .return                     ; if so, return. chunk_y is outside of image. nothing to draw.
+00000566                           344          
+00000566                           345          ; Check for chunk_width = 0
+00000566  2039 000006B2            346          move.l chunk_width, d0 
+0000056C  6700 012A                347          beq .return 
+00000570                           348          
+00000570                           349          ; Check for chunk_height = 0 
+00000570  2039 000006BA            350          move.l chunk_height, d0 
+00000576  6700 0120                351          beq .return 
+0000057A                           352          
+0000057A                           353          ; Clamp chunk_width if needed.
+0000057A  2039 000006A2            354          move.l chunk_x, d0 
+00000580  2239 000006B2            355          move.l chunk_width, d1 
+00000586  2439 000006D2            356          move.l bitmap_width, d2
+0000058C  D081                     357          add.l d1, d0                    ; d0 = rightmost edge of chunk + 1 
+0000058E  5380                     358          subq.l #1, d0                   ; d0 - rightmost edge of chunk
+00000590  B480                     359          cmp.l d0, d2                    ;  is the bitmap width bigger than the rightmost edge?
+00000592  6200 0010                360          bhi .clamp_chunk_h              ; then no need to clamp. go check the chunk height
+00000596  2039 000006A2            361          move.l chunk_x, d0 
+0000059C  9480                     362          sub.l d0, d2                    ; d2 = bitmap width - chunk x 
+0000059E  23C2 000006B2            363          move.l d2, chunk_width          ; save d2 as the new chunk width 
+000005A4                           364          
+000005A4                           365  .clamp_chunk_h
+000005A4  2039 000006AA            366          move.l chunk_y, d0 
+000005AA  2239 000006BA            367          move.l chunk_height, d1 
+000005B0  2439 000006DA            368          move.l bitmap_height, d2 
+000005B6  D081                     369          add.l d1, d0 
+000005B8  5380                     370          subq.l #1, d0                   ; d0 = bottom most edge of chunk
+000005BA  B480                     371          cmp.l d0, d2                    ; is the bitmap height bigger than the bottom (top) most edge?
+000005BC  6200 0010                372          bhi .flip_chunk_y               ; do not clamp if bitmap height is bigger than bottom most edge
+000005C0  2039 000006AA            373          move.l chunk_y, d0 
+000005C6  9480                     374          sub.l d0, d2                    ; d2 = bitmap height - chunk_y
+000005C8  23C2 000006BA            375          move.l d2, chunk_height         ; save the new, clamped chunk height
+000005CE                           376  
+000005CE                           377  .flip_chunk_y     
+000005CE                           378          ; Correct chunk_y because BMP pixel data starts from bottom-left, not top-left
+000005CE  2039 000006AA            379          move.l chunk_y, d0 
+000005D4  2239 000006DA            380          move.l bitmap_height, d1 
+000005DA  9280                     381          sub.l d0, d1 
+000005DC  5381                     382          subq.l #1, d1                  ; d1 = the flipped y position in bitmap
+000005DE  23C1 000006AA            383          move.l d1, chunk_y             ; save the corrected chunk_y
+000005E4                           384          
+000005E4                           385          ; Now we have all the information to perform rendering. 
+000005E4                           386          ; This loop will begin from the bottom left of the chunk data
+000005E4  2C39 000006B2            387          move.l chunk_width, d6          ; d6 = horizontal counter 
+000005EA  2E39 000006BA            388          move.l chunk_height, d7         ; d7 = vertical counter 
+000005F0  2839 000006C2            389          move.l render_x, d4             ; d4 = x rendering position
+000005F6  2A39 000006CA            390          move.l render_y, d5             ; d5 = y rendering position
+000005FC                           391          
+000005FC  2479 000006EE            392          move.l pixel_array_addr, a2    
+00000602  2039 000006A2            393          move.l chunk_x, d0 
+00000608  E288                     394          lsr.l #1, d0            ; divide chunk_x by two to get correct byte offset 
+0000060A  D5C0                     395          add.l d0, a2            ; offset into the pixel array b chunk_x/2 bytes 
+0000060C                           396          
+0000060C  2239 000006F6            397          move.l bitmap_width_bytes, d1   ; d1 = width of a row of pixels in bytes
+00000612  2039 000006AA            398          move.l chunk_y, d0      ; d0 = chunk_y
+00000618  C0C1                     399          mulu.w d1, d0           ; d0 = number of bytes to offset into pixel array, contributed from chunk_y
+0000061A  D5C0                     400          add.l d0, a2            ; a2 = address to start reading pixel data from in loop
+0000061C                           401          
+0000061C                           402  .loop_start 
+0000061C  264A                     403          move.l a2, a3           ; a3 = this row's starting address (save it for later)
+0000061E  2039 000006A2            404          move.l chunk_x, d0      ; get chunk_x
+00000624  0800 0000                405          btst.l #0, d0           ; test least significant bit 
+00000628  6600 002C                406          bne .loop_odd           ; if bit 0 is not equal to 0, start row at loop_odd
+0000062C                           407                                  ; else fall through to .loop_even 
+0000062C                           408          
+0000062C                           409  .loop_even
+0000062C  4280                     410          clr.l d0                  
+0000062E  1012                     411          move.b (a2), d0           ; d0 = byte with two pixels worth of information
+00000630  0200 00F0                412          andi.b #$f0, d0           ; mask out bits to leave the first pixel's color index 
+00000634  E408                     413          lsr.b #2, d0              ; shift twice to the right to get offset into color table in bytes
+00000636                           414                                    ; instead of the andi + lsr, lsr #4 + lsl #2 could be used for same effect
+00000636                           415                                    ; essential 4*index to get the offset in bytes into the color table
+00000636  2079 000006E6            416          move.l color_table_addr, a0 
+0000063C  D1C0                     417          add.l d0, a0              ; a0 = pointer to 4 byte color BGRX 
+0000063E                           418          
+0000063E  2210                     419          move.l (a0), d1           ; d1 = pixel color, BGRX
+00000640  E089                     420          lsr.l #8, d1              ; d1 = pixel color, 0BGR
+00000642  7050                     421          move.l #IO_TASK_PEN_COLOR, d0 
+00000644  4E4F                     422          trap #15                  ; set system's pen color 
+00000646                           423          
+00000646  2204                     424          move.l d4, d1             ; d1 = render x
+00000648  5284                     425          addq.l #1, d4             ; increment render x 
+0000064A  2405                     426          move.l d5, d2             ; d2 = render y 
+0000064C  7052                     427          move.l #IO_TASK_DRAW_PIXEL, d0 
+0000064E  4E4F                     428          trap #15 
+00000650                           429          
+00000650  5386                     430          subq.l #1, d6             ; subtract horizontal counter 
+00000652  6700 002A                431          beq .loop_end             ; branch if finished with row 
+00000656                           432  
+00000656                           433  .loop_odd 
+00000656  4280                     434          clr.l d0                  
+00000658  101A                     435          move.b (a2)+, d0          ; d0 = byte with two pixels worth of information
+0000065A  0200 000F                436          andi.b #$0f, d0           ; mask out bits to leave the second pixel's color index 
+0000065E  E508                     437          lsl.b #2, d0              ; shift twice to the left to mult by 4 to get color table offset
+00000660                           438  
+00000660  2079 000006E6            439          move.l color_table_addr, a0 
+00000666  D1C0                     440          add.l d0, a0              ; a0 = pointer to 4 byte color BGRX 
+00000668                           441          
+00000668  2210                     442          move.l (a0), d1           ; d1 = pixel color, BGRX
+0000066A  E089                     443          lsr.l #8, d1              ; d1 = pixel color, 0BGR
+0000066C  7050                     444          move.l #IO_TASK_PEN_COLOR, d0 
+0000066E  4E4F                     445          trap #15                  ; set system's pen color 
+00000670                           446          
+00000670  2204                     447          move.l d4, d1             ; d1 = render x
+00000672  5284                     448          addq.l #1, d4             ; increment render x 
+00000674  2405                     449          move.l d5, d2             ; d2 = render y 
+00000676  7052                     450          move.l #IO_TASK_DRAW_PIXEL, d0 
+00000678  4E4F                     451          trap #15                  ; draw pixel on screen
+0000067A                           452          
+0000067A  5386                     453          subq.l #1, d6             ; subtract horizontal counter 
+0000067C  66AE                     454          bne .loop_even            ; branch back to even if not finished with row 
+0000067E                           455  
+0000067E                           456  .loop_end      
+0000067E  2839 000006C2            457          move.l render_x, d4       ; reset x rendering position 
+00000684  2C39 000006B2            458          move.l chunk_width, d6    ; reset horizontal counter 
+0000068A  244B                     459          movea.l a3, a2            ; get the address of first pixel for the just-rendered row 
+0000068C  95F9 000006F6            460          suba.l bitmap_width_bytes, a2  ; point to the first pixel of the next row 
+00000692  5285                     461          addq.l #1, d5             ; move the y rendering position one scanline down 
+00000694  5387                     462          subq.l #1, d7             ; decrement the vertical counter by 1 
+00000696  6684                     463          bne .loop_start
+00000698                           464          
+00000698                           465  .return 
+00000698  4E75                     466          rts 
+0000069A                           467  
+0000069A                           468          ORG (*+1)&-2
+0000069A                           469  bitmap_addr            ds 4 
+000006A2                           470  chunk_x                ds 4
+000006AA                           471  chunk_y                ds 4         
+000006B2                           472  chunk_width            ds 4 
+000006BA                           473  chunk_height           ds 4
+000006C2                           474  render_x               ds 4 
+000006CA                           475  render_y               ds 4 
+000006D2                           476  bitmap_width           ds 4 
+000006DA                           477  bitmap_height          ds 4 
+000006E2                           478  bitmap_bpp             ds 2 
+000006E6                           479  color_table_addr       ds 4 
+000006EE                           480  pixel_array_addr       ds 4 
+000006F6                           481  bitmap_width_bytes     ds 4 
+000006FE                           482  
+000006FE                           483  
+000006FE                           484  ;------ SUBROUTINE -------
+000006FE                           485  ; EndianSwap_L
+000006FE                           486  ; Input:
+000006FE                           487  ;   d0.l: value to be swapped
+000006FE                           488  ; Output:
+000006FE                           489  ;   d0.l: the swapped value
+000006FE                           490  ;------------------------- 
+000006FE                           491  EndianSwap_L:
+000006FE  E158                     492          rol.w #8, d0 
+00000700  4840                     493          swap.w d0 
+00000702  E158                     494          rol.w #8, d0 
+00000704  4E75                     495          rts
+00000706                           496          
+00000706                           497          
+00000706                           498  ;------ SUBROUTINE -------
+00000706                           499  ; EndianSwap_W
+00000706                           500  ; Input:
+00000706                           501  ;   d0.w: value to be swapped
+00000706                           502  ; Output:
+00000706                           503  ;   d0.w: the swapped value
+00000706                           504  ;------------------------- 
+00000706                           505  EndianSwap_W:
+00000706  E158                     506          rol.w #8, d0 
+00000708  4E75                     507          rts
+00000708  4E75                     508  -------------------- end include --------------------
+0000070A                           509      INCLUDE "source/start.asm"
+0000070A                           510  ; ------ SUBROUTINE ------
+0000070A                           511  ; LoadStart
+0000070A                           512  ;
+0000070A                           513  ; Loads graphics data necessary for displaying the 
+0000070A                           514  ; start screen. 
+0000070A                           515  ; ------------------------      
+0000070A                           516  LoadStart:
+0000070A                           517  
+0000070A  7000                     518      move.l #0, d0             ; param d0: chunk x coordinate
+0000070C  7200                     519      move.l #0, d1             ; param d1: chunk y coordinate 
+0000070E  243C 00000140            520      move.l #320, d2           ; param d2: chunk width 
+00000714  263C 000000E0            521      move.l #224, d3           ; param d3: chunk height 
+0000071A  7800                     522      move.l #0, d4             ; param d4: screen x coordinate
+0000071C  7A00                     523      move.l #0, d5             ; param d5: screen y coordinate 
+0000071E  41F9 000015BE            524      lea TitleBitmap, a0       ; param a0: pointer to bitmap file data
+00000724  4EB8 04A2                525      jsr RenderBitmap16 
+00000728                           526      
+00000728  4E75                     527      rts 
+0000072A                           528      
+0000072A                           529  ; ------ SUBROUTINE ------
+0000072A                           530  ; UpdateStart
+0000072A                           531  ;
+0000072A                           532  ; Checks if the user has pressed start to begin 
+0000072A                           533  ; the game.
+0000072A                           534  ; ------------------------      
+0000072A                           535  UpdateStart:
+0000072A                           536      
+0000072A                           537      ; Update the frame counter in preparation 
+0000072A                           538      ; for seeding the random number generator 
+0000072A  3038 042E                539      move.w FrameCounter, d0 
+0000072E  5240                     540      addq.w #1, d0 
+00000730  31C0 042E                541      move.w d0, FrameCounter
+00000734                           542      
+00000734                           543      ; Check if the start button is down.
+00000734                           544      ; If so, transition to game
+00000734  3038 0406                545      move.w ButtonsDown, d0 
+00000738  0800 000D                546      btst #BUTTON_START, d0
+0000073C  6600 0016                547      bne .return 
+00000740  4EB9 00000756            548      jsr SetRandSeed
+00000746  4EB9 00000760            549      jsr LoadGame
+0000074C  21FC 00000001 040A       550      move.l #STATE_AIM, GameState
+00000754                           551  .return 
+00000754  4E75                     552      rts 
+00000756                           553      
+00000756                           554  SetRandSeed:
+00000756                           555  
+00000756  3038 042E                556      move.w FrameCounter, d0 
+0000075A  4EB8 043E                557      jsr SeedRandom
+0000075E  4E75                     558      rts 
+0000075E  4E75                     559  -------------------- end include --------------------
+00000760                           560      INCLUDE "source/game.asm"
+00000760                           561  ; ------ SUBROUTINE ------
+00000760                           562  ; LoadGame
+00000760                           563  ;
+00000760                           564  ; Changes the scroll A map to the game map. 
+00000760                           565  ; Initializes important game variables.
+00000760                           566  ; Should be called before starting a new game
+00000760                           567  ; from level 0.
+00000760                           568  ; ------------------------  
+00000760                           569  LoadGame:
+00000760                           570      
+00000760                           571      ; Initialize ball 
+00000760  41F8 03C6                572      lea Ball, a0 
+00000764  4EB9 0000118E            573      jsr Ball_Init 
+0000076A                           574      
+0000076A                           575      ; Initialize saver 
+0000076A  41F8 03E6                576      lea Saver, a0 
+0000076E  4EB9 000014E4            577      jsr Saver_Init
+00000774                           578      
+00000774                           579      ;Draw background 
+00000774  4EB9 00000AC8            580      jsr DrawBackground 
+0000077A                           581      
+0000077A  21FC 00000000 0416       582      move.l #0, Level
+00000782  4EB9 00000798            583      jsr LoadLevel
+00000788                           584      
+00000788                           585      ; Reset score 
+00000788  21FC 00000000 043A       586      move.l #0, Score 
+00000790  4EB9 00000A86            587      jsr DrawScore
+00000796                           588      
+00000796  4E75                     589      rts
+00000798                           590      
+00000798                           591  ; ------ SUBROUTINE ------
+00000798                           592  ; LoadLevel
+00000798                           593  ;
+00000798                           594  ; Loads the level based on the value in 
+00000798                           595  ; Level global variable.
+00000798                           596  ; ------------------------  
+00000798                           597  LoadLevel:
+00000798                           598  
+00000798                           599      ; Reset aim angle 
+00000798  21FC 00005A00 0412       600      move.l #AIM_START_ANGLE, AimAngle 
+000007A0                           601      
+000007A0                           602      ; Reset pegs to default values 
+000007A0  4EB9 00000A36            603      jsr ClearPegs
+000007A6                           604      
+000007A6                           605      ; Get the level data needed for loading
+000007A6  2038 0416                606      move.l Level, d0 
+000007AA  0C80 00000008            607      cmpi.l #(NUM_LEVELS), d0
+000007B0  6500 0004                608      blo .load_pegs 
+000007B4                           609      
+000007B4                           610      ; confine level number to range [0, NUM_LEVELS)
+000007B4  7007                     611      move.l #(NUM_LEVELS-1), d0 
+000007B6                           612      
+000007B6                           613  .load_pegs
+000007B6                           614      ; d0 contains level number. 
+000007B6                           615      ; multiply it by 4 to get the long offset into level data table 
+000007B6  E588                     616      lsl.l #2, d0 
+000007B8  41F9 00013246            617      lea LevelData, a0 
+000007BE  D1C0                     618      add.l d0, a0            ; a0 now pointing at current level data address
+000007C0  2250                     619      move.l (a0), a1         ; a1 is not pointing to current level data 
+000007C2  2049                     620      move.l a1, a0           ; but put this back in a0 
+000007C4                           621      
+000007C4                           622      ; Get the level properties 
+000007C4  21E8 0000 041E           623      move.l LEVEL_PEG_COUNT_OFFSET(a0), LevelPegCount
+000007CA  21E8 0004 0422           624      move.l LEVEL_RED_PEG_COUNT_OFFSET(a0), LevelRedPegCount 
+000007D0  21E8 0008 0426           625      move.l LEVEL_BALL_COUNT_OFFSET(a0), LevelBallCount 
+000007D6  21F8 041E 0436           626      move.l LevelPegCount, PegCount
+000007DC  21F8 0422 0432           627      move.l LevelRedPegCount, RedPegCount    ; set the number of red pegs to get 
+000007E2  21F8 0426 041A           628      move.l LevelBallCount, BallCount        ; reset ball count 
+000007E8                           629      
+000007E8  D1FC 0000000C            630      adda.l #LEVEL_PEGS_OFFSET, a0       ; a0 = pointer to peg pos array in leveldata  
+000007EE  43F8 0006                631      lea Pegs, a1                        ; a1 = peg array 
+000007F2  4280                     632      clr.l d0                            ; d0 = counter 
+000007F4                           633      
+000007F4                           634      ; Loop through the peg data and position pegs accordingly
+000007F4                           635  .peg_loop 
+000007F4                           636      ; set x position of peg 
+000007F4  4281                     637      clr.l d1 
+000007F6  3218                     638      move.w (a0)+, d1            ; d1 = x pos 
+000007F8  E189                     639      lsl.l #8, d1                ; convert from integer to fixed 
+000007FA  2341 0000                640      move.l d1, M_PEG_X(a1)
+000007FE                           641      
+000007FE                           642      ; set y position of peg 
+000007FE  4281                     643      clr.l d1 
+00000800  3218                     644      move.w (a0)+, d1 
+00000802  E189                     645      lsl.l #8, d1 
+00000804  2341 0004                646      move.l d1, M_PEG_Y(a1)
+00000808                           647      
+00000808                           648      ; mark the peg as active 
+00000808  137C 0001 0011           649      move.b #1, M_PEG_ACTIVE(a1)    ; 1 = active 
+0000080E                           650      
+0000080E                           651      ; Update peg sprite 
+0000080E  2F08                     652      move.l a0, -(sp)
+00000810  2F09                     653      move.l a1, -(sp)
+00000812  2F00                     654      move.l d0, -(sp)            ; save reg state
+00000814                           655      
+00000814  2049                     656      move.l a1, a0 
+00000816  4EB9 000013B2            657      jsr Peg_Draw
+0000081C                           658      
+0000081C  201F                     659      move.l (sp)+, d0 
+0000081E  225F                     660      move.l (sp)+, a1 
+00000820  205F                     661      move.l (sp)+, a0            ; restore reg state
+00000822                           662      
+00000822                           663      ; point to next peg struct in preparation for next iteration 
+00000822  D3FC 00000020            664      adda.l #PEG_DATA_SIZE, a1 
+00000828                           665      
+00000828                           666      ; check if loop should be repeated 
+00000828  5280                     667      addq.l #1, d0 
+0000082A  B0B8 041E                668      cmp.l LevelPegCount, d0 
+0000082E  66C4                     669      bne .peg_loop
+00000830                           670      
+00000830                           671  .set_red_pegs 
+00000830  2238 0422                672      move.l LevelRedPegCount, d1 
+00000834  2438 041E                673      move.l LevelPegCount, d2 
+00000838                           674      
+00000838                           675  .red_peg_loop
+00000838                           676      ; First, get a random byte value 
+00000838  48E7 6000                677      movem.l d1-d2, -(sp)    ; save regs before calling Peg_InitSprite 
+0000083C  4EB8 0444                678      jsr Random          ; d0.b = random value 
+00000840  4CDF 0006                679      movem.l (sp)+, d1-d2 
+00000844                           680      
+00000844  80C2                     681      divu d2, d0             ; random val / num pegs 
+00000846  4840                     682      swap.w d0               ; get the remainder into d0.w 
+00000848  0280 0000FFFF            683      andi.l #$0000ffff, d0   ; clear the quotient portion 
+0000084E                           684      
+0000084E                           685      ; get the peg at this index 
+0000084E  EB88                     686      lsl.l #PEG_SIZE_SHIFT, d0
+00000850  41F8 0006                687      lea Pegs, a0 
+00000854  D1C0                     688      add.l d0, a0 
+00000856                           689      
+00000856                           690      ; examine this random peg. if it's already red, then 
+00000856                           691      ; keep looping until a blue one is found 
+00000856                           692  .find_blue_loop
+00000856  1628 0010                693      move.b M_PEG_TYPE(a0), d3 
+0000085A  0C03 0000                694      cmpi.b #PEG_TYPE_BLUE, d3 
+0000085E  6700 0018                695      beq .found_blue                 ; is this a blue peg? Then branch past this infinite loop 
+00000862                           696      
+00000862  D1FC 00000020            697      adda.l #PEG_DATA_SIZE, a0       ; increment to next peg 
+00000868  B1FC 000003C6            698      cmp.l #(Pegs+PEG_DATA_SIZE*MAX_PEGS), a0 ; but check if we just overran the peg array 
+0000086E  65E6                     699      blo .find_blue_loop
+00000870                           700      
+00000870  41F8 0006                701      lea Pegs, a0                   ; we are past the last peg in the array. reset to first peg.
+00000874  4EF8 0856                702      jmp .find_blue_loop
+00000878                           703      
+00000878                           704  .found_blue 
+00000878                           705      ; A blue peg as found. Set it to red and then update the sprite 
+00000878  117C 0001 0010           706      move.b #PEG_TYPE_RED, M_PEG_TYPE(a0)
+0000087E                           707      
+0000087E  48E7 6000                708      movem.l d1-d2, -(sp)    ; save regs before calling Peg_InitSprite 
+00000882  4EB9 000013B2            709      jsr Peg_Draw
+00000888  4CDF 0006                710      movem.l (sp)+, d1-d2 
+0000088C                           711      
+0000088C                           712      ; decrement counter 
+0000088C  5381                     713      subq.l #1, d1 
+0000088E  66A8                     714      bne .red_peg_loop
+00000890                           715      
+00000890                           716      ; draw the new ball count 
+00000890  4EB9 00000AC6            717      jsr DrawBallCount
+00000896                           718      
+00000896  4E75                     719      rts 
+00000898                           720      
+00000898                           721  ; ------ SUBROUTINE ------
+00000898                           722  ; UpdateAim
+00000898                           723  ;
+00000898                           724  ; Updates the aim angle based on user input.
+00000898                           725  ; Sets the ball based on the aim angle. 
+00000898                           726  ; Will launch ball and enter the resolve state 
+00000898                           727  ; if the user pressed A. 
+00000898                           728  ; Should only be called in STATE_AIM
+00000898                           729  ; ------------------------  
+00000898                           730  UpdateAim:
+00000898                           731  
+00000898  3038 0406                732      move.w ButtonsDown, d0 
+0000089C  2238 0412                733      move.l AimAngle, d1
+000008A0                           734      
+000008A0  0800 0002                735      btst #BUTTON_LEFT, d0 
+000008A4  6600 000E                736      bne .check_right
+000008A8  0681 00000200            737      addi.l #AIM_ANGLE_DELTA, d1 
+000008AE  4EF9 000008C2            738      jmp .clamp_aim_angle
+000008B4                           739  .check_right
+000008B4  0800 0003                740      btst #BUTTON_RIGHT, d0 
+000008B8  6600 0008                741      bne .clamp_aim_angle
+000008BC  0481 00000200            742      subi.l #AIM_ANGLE_DELTA, d1 
+000008C2                           743      
+000008C2                           744  .clamp_aim_angle
+000008C2  0C81 00000500            745      cmpi.l #AIM_ANGLE_MIN, d1 
+000008C8  6E00 000E                746      bgt .check_clamp_max
+000008CC  223C 00000500            747      move.l #AIM_ANGLE_MIN, d1 
+000008D2  4EF9 000008E8            748      jmp .save_aim_angle
+000008D8                           749  .check_clamp_max
+000008D8  0C81 0000AF00            750      cmpi.l #AIM_ANGLE_MAX, d1 
+000008DE  6D00 0008                751      blt .save_aim_angle 
+000008E2  223C 0000AF00            752      move.l #AIM_ANGLE_MAX, d1 
+000008E8                           753      
+000008E8                           754  .save_aim_angle
+000008E8  21C1 0412                755      move.l d1, AimAngle 
+000008EC                           756      
+000008EC  4EB9 00000904            757      jsr _PositionBall
+000008F2  4EB9 0000095C            758      jsr _CheckLaunch
+000008F8                           759      
+000008F8  41F8 03E6                760      lea Saver, a0  
+000008FC  4EB9 00001556            761      jsr Saver_Update 
+00000902                           762  
+00000902                           763  .return 
+00000902  4E75                     764      rts 
+00000904                           765      
+00000904                           766  ; ------ SUBROUTINE ------
+00000904                           767  ; _PositionBall
+00000904                           768  ;
+00000904                           769  ; Private subroutine that positions the ball 
+00000904                           770  ; based on the current AimAngle.
+00000904                           771  ; ------------------------  
+00000904                           772  _PositionBall:
+00000904                           773      
+00000904  41F8 03C6                774      lea Ball, a0 
+00000908  4EB9 00001262            775      jsr Ball_Hide
+0000090E                           776      
+0000090E                           777      ; Get delta x from center 
+0000090E  701E                     778      move.l #(AIM_RADIUS>>8), d0         
+00000910  2238 0412                779      move.l AimAngle, d1             ; load global var AimAngle into d1 
+00000914  E089                     780      lsr.l #8, d1                    ; convert from fixed to int 
+00000916                           781      
+00000916  41F9 00000DBA            782      lea CosTable, a0 
+0000091C  E389                     783      lsl.l #1, d1                    ; multiply angle by 2 to get word-offset into table 
+0000091E  D1C1                     784      add.l d1, a0                    ; a0 pointing at cos((int)AimAngle)
+00000920  3210                     785      move.w (a0), d1                 ; d1 = 8.8 cos value 
+00000922                           786      
+00000922  C3C0                     787      muls d0, d1                     ; d1 = AIM_RADIUS * cos(AimAngle) = DeltaX * 256 
+00000924                           788      
+00000924  243C 00009A00            789      move.l #AIM_CENTER_X, d2 
+0000092A  D282                     790      add.l d2, d1                    ; d1 = ball x pos. (x = AIM_CENTER_X + DeltaX)
+0000092C                           791      
+0000092C                           792  
+0000092C                           793      ; Get delta y from center 
+0000092C  2438 0412                794      move.l AimAngle, d2             ; load global var AimAngle into d2 
+00000930  E08A                     795      lsr.l #8, d2                    ; convert from fixed to int 
+00000932                           796      
+00000932  41F9 00000AEA            797      lea SinTable, a0 
+00000938  E38A                     798      lsl.l #1, d2                    ; multiply angle by 2 to get word-offset into table 
+0000093A  D1C2                     799      add.l d2, a0                    ; a0 pointing at sin((int)AimAngle)
+0000093C  3410                     800      move.w (a0), d2                 ; d2 = 8.8 sin value 
+0000093E                           801      
+0000093E  C5C0                     802      muls d0, d2                     ; d2 = AIM_RADIUS * sin(AimAngle) = DeltaX * 256 
+00000940                           803      
+00000940  263C 00000500            804      move.l #AIM_CENTER_Y, d3 
+00000946  D483                     805      add.l d3, d2                    ; d3 = ball y pos. (y = AIM_CENTER_Y + DeltaX)
+00000948                           806      
+00000948                           807      ; Update the ball position
+00000948  41F8 03C6                808      lea Ball, a0 
+0000094C  2141 0000                809      move.l d1, M_BALL_X(a0)
+00000950  2142 0004                810      move.l d2, M_BALL_Y(a0)
+00000954  4EB9 00001242            811      jsr Ball_Draw
+0000095A                           812  
+0000095A                           813  .return 
+0000095A                           814  
+0000095A  4E75                     815      rts 
+0000095C                           816  
+0000095C                           817  ; ------ SUBROUTINE ------
+0000095C                           818  ; _CheckLaunch
+0000095C                           819  ;
+0000095C                           820  ; Private subroutine that checks if the user 
+0000095C                           821  ; has pressed the A button to launch the ball.
+0000095C                           822  ; If A is pressed, the ball's x/y velocity is 
+0000095C                           823  ; is set and the game state is changed to 
+0000095C                           824  ; STATE_RESOLVE. 
+0000095C                           825  ; This subroutine should only be called from 
+0000095C                           826  ; UpdateAim
+0000095C                           827  ; ------------------------  
+0000095C                           828  _CheckLaunch:
+0000095C                           829  
+0000095C  3038 0406                830      move.w ButtonsDown, d0 
+00000960  0800 000C                831      btst #BUTTON_A, d0 
+00000964  6600 004C                832      bne .return 
+00000968                           833      
+00000968                           834      ; Set the ball's x/y velocity
+00000968                           835      ; First find the x-component of velocity 
+00000968  203C 00000400            836      move.l #(LAUNCH_SPEED), d0      ; d0 = LAUNCH_SPEED in fixed 24.8
+0000096E  2238 0412                837      move.l AimAngle, d1             ; load global var AimAngle into d1 
+00000972  E081                     838      asr.l #8, d1                    ; convert from fixed to int 
+00000974  41F9 00000DBA            839      lea CosTable, a0 
+0000097A  E381                     840      asl.l #1, d1                    ; mult by 2 to get word-offset into table 
+0000097C  D1C1                     841      add.l d1, a0                    ; find the cos value. The angle should already be in range 5-175.
+0000097E                           842      
+0000097E  3210                     843      move.w (a0), d1                 ; d1 = 8.8 value 
+00000980  C3C0                     844      muls d0, d1                     ; mult to get the xvel component of LAUNCH_SPEED
+00000982                           845      
+00000982  E081                     846      asr.l #8, d1                    ; result is in 16.16 format. shift right to get into 24.8
+00000984  2401                     847      move.l d1, d2                   ; d2 = xvel component 
+00000986                           848      
+00000986                           849      ; Next find the y component of velocity 
+00000986  2238 0412                850      move.l AimAngle, d1 
+0000098A  E081                     851      asr.l #8, d1 
+0000098C  41F9 00000AEA            852      lea SinTable, a0 
+00000992  E381                     853      asl.l #1, d1 
+00000994  D1C1                     854      add.l d1, a0 
+00000996                           855      
+00000996  3210                     856      move.w (a0), d1 
+00000998  C3C0                     857      muls d0, d1 
+0000099A                           858      
+0000099A  E081                     859      asr.l #8, d1                    ; convert from 16.16 to 24.8 
+0000099C  2601                     860      move.l d1, d3                   ; d3 = yvel component
+0000099E                           861      
+0000099E                           862      ; Update the ball struct's new xvel and yvel 
+0000099E  41F8 03C6                863      lea Ball, a0 
+000009A2  2142 0010                864      move.l d2, M_BALL_XVEL(a0)
+000009A6  2143 0014                865      move.l d3, M_BALL_YVEL(a0)
+000009AA                           866      
+000009AA                           867      ; Change the game state 
+000009AA  21FC 00000002 040A       868      move.l #STATE_RESOLVE, GameState
+000009B2                           869      
+000009B2                           870  .return 
+000009B2  4E75                     871      rts 
+000009B4                           872  
+000009B4                           873  ; ------ SUBROUTINE ------
+000009B4                           874  ; UpdateResolve
+000009B4                           875  ;
+000009B4                           876  ; Will update the game physics, resolve collisions
+000009B4                           877  ; that occur between the ball and pegs. Will change 
+000009B4                           878  ; state to STATE_AIM if the ball falls below 
+000009B4                           879  ; FALLOUT_Y or if the ball collides with the saver. 
+000009B4                           880  ; Will change state to STATE_LOSE if the player
+000009B4                           881  ; has no more lives. Will change state to 
+000009B4                           882  ; STATE_WIN if all orange pegs are cleared on level
+000009B4                           883  ; NUM_LEVELS-1.
+000009B4                           884  ; ------------------------  
+000009B4                           885  UpdateResolve:
+000009B4                           886  
+000009B4  41F8 03C6                887      lea Ball, a0 
+000009B8  4EB9 000011C0            888      jsr Ball_Update 
+000009BE                           889      
+000009BE  41F8 03E6                890      lea Saver, a0  
+000009C2  4EB9 00001556            891      jsr Saver_Update 
+000009C8                           892      
+000009C8                           893      ; Check if the stage has been cleared. (no red pegs remaining)
+000009C8  2038 0432                894      move.l RedPegCount, d0 
+000009CC  0C80 00000000            895      cmpi.l #0, d0 
+000009D2  6600 0018                896      bne .check_fallout
+000009D6                           897      ; increment level and call load level again
+000009D6  52B8 0416                898      addq.l #1, Level 
+000009DA  4EB8 0798                899      jsr LoadLevel 
+000009DE  21FC 00000001 040A       900      move.l #STATE_AIM, GameState
+000009E6  4EF9 00000A34            901      jmp .return 
+000009EC                           902      
+000009EC                           903  .check_fallout
+000009EC                           904      ; Check if the ball has passed the fallout threshold 
+000009EC  41F8 03C6                905      lea Ball, a0 
+000009F0  2028 0004                906      move.l M_BALL_Y(a0), d0 
+000009F4  0C80 0000E000            907      cmpi.l #FALLOUT_Y, d0 
+000009FA  6D00 0038                908      blt .return 
+000009FE                           909      
+000009FE                           910      ; Ball has passed fallout_y, so decrement BallCount 
+000009FE                           911      ; and if ball count is 0, then go to lose state 
+000009FE  2038 041A                912      move.l BallCount, d0 
+00000A02  5380                     913      subq.l #1, d0 
+00000A04  21C0 041A                914      move.l d0, BallCount
+00000A08  4EB9 00000AC6            915      jsr DrawBallCount
+00000A0E  0CB8 00000000 041A       916      cmpi.l #0, BallCount 
+00000A16  6600 0014                917      bne .set_state_aim
+00000A1A  21FC 00000003 040A       918      move.l #STATE_LOSE, GameState
+00000A22  4EB8 070A                919      jsr LoadStart
+00000A26  4EF9 00000A34            920      jmp .return 
+00000A2C                           921  .set_state_aim 
+00000A2C  21FC 00000001 040A       922      move.l #STATE_AIM, GameState
+00000A34                           923      
+00000A34                           924  .return 
+00000A34  4E75                     925      rts
+00000A36                           926      
+00000A36                           927  ; ------ SUBROUTINE ------
+00000A36                           928  ; ClearPegs
+00000A36                           929  ;
+00000A36                           930  ; This will deactive all pegs and set their 
+00000A36                           931  ; sprites offscreen. Will also set their 
+00000A36                           932  ; sprite index appropriately.
+00000A36                           933  ; ------------------------  
+00000A36                           934  ClearPegs:
+00000A36                           935  
+00000A36  =00000000                936  L_CUR_PEG   SET 0 
+00000A36  =00000004                937  L_COUNTER   SET 4 
+00000A36  =00000008                938  LVARS_SIZE  SET 8 
+00000A36                           939  
+00000A36                           940      ; add local vars to stack 
+00000A36  518F                     941      sub.l #LVARS_SIZE, sp 
+00000A38  41F8 0006                942      lea Pegs, a0        ; a0 = pointer to cur peg 
+00000A3C  4280                     943      clr.l d0            ; d0 = counter 
+00000A3E  2F48 0000                944      move.l a0, L_CUR_PEG(sp)
+00000A42  2F40 0004                945      move.l d0, L_COUNTER(sp)
+00000A46                           946      
+00000A46                           947  .loop 
+00000A46                           948      
+00000A46                           949      ; Initialize the peg 
+00000A46  4EB9 0000136C            950      jsr Peg_Init
+00000A4C                           951      
+00000A4C                           952      ; Set the approriate sprite index 
+00000A4C  206F 0000                953      move.l L_CUR_PEG(sp), a0        ; restore local vars to registers
+00000A50  202F 0004                954      move.l L_COUNTER(sp), d0 
+00000A54  2200                     955      move.l d0, d1 
+00000A56  5481                     956      addq.l #PEGS_SPRITE_INDEX, d1   ; d1 = sprite index 
+00000A58  1141 0013                957      move.b d1, M_PEG_SPRITE_INDEX(a0)
+00000A5C                           958  
+00000A5C  202F 0004                959      move.l L_COUNTER(sp), d0 
+00000A60  5280                     960      addq.l #1, d0 
+00000A62  2F40 0004                961      move.l d0, L_COUNTER(sp)
+00000A66  0C80 0000001E            962      cmpi.l #MAX_PEGS, d0 
+00000A6C  6700 0014                963      beq .return 
+00000A70                           964      
+00000A70                           965      ; move pointer to next peg 
+00000A70  206F 0000                966      move.l L_CUR_PEG(sp), a0 
+00000A74  D1FC 00000020            967      add.l #PEG_DATA_SIZE, a0 
+00000A7A  2F48 0000                968      move.l a0, L_CUR_PEG(sp)
+00000A7E  4EF8 0A46                969      jmp .loop 
+00000A82                           970      
+00000A82                           971  .return 
+00000A82                           972  
+00000A82                           973      ; remove local vars from stack 
+00000A82  508F                     974      add.l #LVARS_SIZE, sp 
+00000A84  4E75                     975      rts
+00000A86                           976      
+00000A86                           977  ; ------ SUBROUTINE ------
+00000A86                           978  ; DrawScore
+00000A86                           979  ;
+00000A86                           980  ; Uses the current score in the Score 
+00000A86                           981  ; global bss variable to draw digits 
+00000A86                           982  ; on Plane A in decimal.
+00000A86                           983  ; ------------------------  
+00000A86                           984  DrawScore:
+00000A86  =00000000                985  L_DIGIT3 SET 0
+00000A86  =00000002                986  L_DIGIT2 SET 2
+00000A86  =00000004                987  L_DIGIT1 SET 4
+00000A86  =00000006                988  LVARS_SIZE SET 6 
+00000A86                           989  
+00000A86                           990      ; allocate local vars
+00000A86  5D8F                     991      sub.l #LVARS_SIZE, sp 
+00000A88                           992      
+00000A88                           993      ; Get first digit of score 
+00000A88  2038 043A                994      move.l Score, d0 
+00000A8C  80FC 000A                995      divu #10, d0 
+00000A90  2200                     996      move.l d0, d1 
+00000A92  4841                     997      swap.w d1
+00000A94  3F41 0004                998      move.w d1, L_DIGIT1(sp)
+00000A98  0280 0000FFFF            999      andi.l #$0000ffff, d0 
+00000A9E                          1000  
+00000A9E                          1001      ; second digit 
+00000A9E  80FC 000A               1002      divu #10, d0 
+00000AA2  2200                    1003      move.l d0, d1 
+00000AA4  4841                    1004      swap.w d1
+00000AA6  3F41 0002               1005      move.w d1, L_DIGIT2(sp)    
+00000AAA  0280 0000FFFF           1006      andi.l #$0000ffff, d0 
+00000AB0                          1007      
+00000AB0                          1008      ; third digit 
+00000AB0  80FC 000A               1009      divu #10, d0 
+00000AB4  2200                    1010      move.l d0, d1 
+00000AB6  4841                    1011      swap.w d1
+00000AB8  3F41 0000               1012      move.w d1, L_DIGIT3(sp)
+00000ABC  0280 0000FFFF           1013      andi.l #$0000ffff, d0 
+00000AC2                          1014      
+00000AC2                          1015      ; E68 TODO
+00000AC2                          1016      ;PRINT_THE_SCORE_HERE 
+00000AC2                          1017      
+00000AC2                          1018      ; destroy local vars
+00000AC2  5C8F                    1019      add.l #LVARS_SIZE, sp 
+00000AC4                          1020  
+00000AC4  4E75                    1021      rts 
+00000AC6                          1022      
+00000AC6                          1023  ; ------ SUBROUTINE ------
+00000AC6                          1024  ; DrawBallCount
+00000AC6                          1025  ;
+00000AC6                          1026  ; Draws the ball count number on the 
+00000AC6                          1027  ; screen (MAX BALLS = 9) by placing the 
+00000AC6                          1028  ; proper glyphs into plane a's name table.
+00000AC6                          1029  ; ------------------------  
+00000AC6                          1030  DrawBallCount:
+00000AC6                          1031      
+00000AC6                          1032      ; Assume that MAX_BALL_COUNT is being 
+00000AC6                          1033      ; used elsewhere to properly clamp the maximum balls
+00000AC6                          1034      ; the player can have 
+00000AC6                          1035      
+00000AC6                          1036      ; E68 TODO
+00000AC6                          1037      ;PRINT_THE_TEXT_HERE
+00000AC6                          1038      
+00000AC6  4E75                    1039      rts
+00000AC8                          1040      
+00000AC8                          1041      
+00000AC8                          1042  DrawBackground:
+00000AC8                          1043  
+00000AC8  7000                    1044      move.l #0, d0             ; param d0: chunk x coordinate
+00000ACA  7200                    1045      move.l #0, d1             ; param d1: chunk y coordinate 
+00000ACC  243C 00000140           1046      move.l #320, d2            ; param d2: chunk width 
+00000AD2  263C 000000E0           1047      move.l #224, d3            ; param d3: chunk height 
+00000AD8  7800                    1048      move.l #0, d4             ; param d4: screen x coordinate
+00000ADA  7A00                    1049      move.l #0, d5             ; param d5: screen y coordinate 
+00000ADC  41F9 0000A50C           1050      lea BGBitmap, a0       ; param a0: pointer to bitmap file data
+00000AE2  4EB8 04A2               1051      jsr RenderBitmap16 
+00000AE6  4E75                    1052      rts 
+00000AE8                          1053      
+00000AE8  4E75                    1054      rts 
+00000AE8  4E75                    1055  -------------------- end include --------------------
+00000AEA                          1056      INCLUDE "source/tables.asm"
+00000AEA                          1057  SinTable:
+00000AEA= 0000                    1058      dc.w 0
+00000AEC= 0004                    1059      dc.w 4
+00000AEE= 0008                    1060      dc.w 8
+00000AF0= 000D                    1061      dc.w 13
+00000AF2= 0011                    1062      dc.w 17
+00000AF4= 0016                    1063      dc.w 22
+00000AF6= 001A                    1064      dc.w 26
+00000AF8= 001F                    1065      dc.w 31
+00000AFA= 0023                    1066      dc.w 35
+00000AFC= 0028                    1067      dc.w 40
+00000AFE= 002C                    1068      dc.w 44
+00000B00= 0030                    1069      dc.w 48
+00000B02= 0035                    1070      dc.w 53
+00000B04= 0039                    1071      dc.w 57
+00000B06= 003D                    1072      dc.w 61
+00000B08= 0042                    1073      dc.w 66
+00000B0A= 0046                    1074      dc.w 70
+00000B0C= 004A                    1075      dc.w 74
+00000B0E= 004F                    1076      dc.w 79
+00000B10= 0053                    1077      dc.w 83
+00000B12= 0057                    1078      dc.w 87
+00000B14= 005B                    1079      dc.w 91
+00000B16= 005F                    1080      dc.w 95
+00000B18= 0064                    1081      dc.w 100
+00000B1A= 0068                    1082      dc.w 104
+00000B1C= 006C                    1083      dc.w 108
+00000B1E= 0070                    1084      dc.w 112
+00000B20= 0074                    1085      dc.w 116
+00000B22= 0078                    1086      dc.w 120
+00000B24= 007C                    1087      dc.w 124
+00000B26= 0080                    1088      dc.w 128
+00000B28= 0083                    1089      dc.w 131
+00000B2A= 0087                    1090      dc.w 135
+00000B2C= 008B                    1091      dc.w 139
+00000B2E= 008F                    1092      dc.w 143
+00000B30= 0092                    1093      dc.w 146
+00000B32= 0096                    1094      dc.w 150
+00000B34= 009A                    1095      dc.w 154
+00000B36= 009D                    1096      dc.w 157
+00000B38= 00A1                    1097      dc.w 161
+00000B3A= 00A4                    1098      dc.w 164
+00000B3C= 00A7                    1099      dc.w 167
+00000B3E= 00AB                    1100      dc.w 171
+00000B40= 00AE                    1101      dc.w 174
+00000B42= 00B1                    1102      dc.w 177
+00000B44= 00B5                    1103      dc.w 181
+00000B46= 00B8                    1104      dc.w 184
+00000B48= 00BB                    1105      dc.w 187
+00000B4A= 00BE                    1106      dc.w 190
+00000B4C= 00C1                    1107      dc.w 193
+00000B4E= 00C4                    1108      dc.w 196
+00000B50= 00C6                    1109      dc.w 198
+00000B52= 00C9                    1110      dc.w 201
+00000B54= 00CC                    1111      dc.w 204
+00000B56= 00CF                    1112      dc.w 207
+00000B58= 00D1                    1113      dc.w 209
+00000B5A= 00D4                    1114      dc.w 212
+00000B5C= 00D6                    1115      dc.w 214
+00000B5E= 00D9                    1116      dc.w 217
+00000B60= 00DB                    1117      dc.w 219
+00000B62= 00DD                    1118      dc.w 221
+00000B64= 00DF                    1119      dc.w 223
+00000B66= 00E2                    1120      dc.w 226
+00000B68= 00E4                    1121      dc.w 228
+00000B6A= 00E6                    1122      dc.w 230
+00000B6C= 00E8                    1123      dc.w 232
+00000B6E= 00E9                    1124      dc.w 233
+00000B70= 00EB                    1125      dc.w 235
+00000B72= 00ED                    1126      dc.w 237
+00000B74= 00EE                    1127      dc.w 238
+00000B76= 00F0                    1128      dc.w 240
+00000B78= 00F2                    1129      dc.w 242
+00000B7A= 00F3                    1130      dc.w 243
+00000B7C= 00F4                    1131      dc.w 244
+00000B7E= 00F6                    1132      dc.w 246
+00000B80= 00F7                    1133      dc.w 247
+00000B82= 00F8                    1134      dc.w 248
+00000B84= 00F9                    1135      dc.w 249
+00000B86= 00FA                    1136      dc.w 250
+00000B88= 00FB                    1137      dc.w 251
+00000B8A= 00FC                    1138      dc.w 252
+00000B8C= 00FC                    1139      dc.w 252
+00000B8E= 00FD                    1140      dc.w 253
+00000B90= 00FE                    1141      dc.w 254
+00000B92= 00FE                    1142      dc.w 254
+00000B94= 00FF                    1143      dc.w 255
+00000B96= 00FF                    1144      dc.w 255
+00000B98= 00FF                    1145      dc.w 255
+00000B9A= 00FF                    1146      dc.w 255
+00000B9C= 00FF                    1147      dc.w 255
+00000B9E= 00FF                    1148      dc.w 255
+00000BA0= 00FF                    1149      dc.w 255
+00000BA2= 00FF                    1150      dc.w 255
+00000BA4= 00FF                    1151      dc.w 255
+00000BA6= 00FF                    1152      dc.w 255
+00000BA8= 00FF                    1153      dc.w 255
+00000BAA= 00FE                    1154      dc.w 254
+00000BAC= 00FE                    1155      dc.w 254
+00000BAE= 00FD                    1156      dc.w 253
+00000BB0= 00FC                    1157      dc.w 252
+00000BB2= 00FC                    1158      dc.w 252
+00000BB4= 00FB                    1159      dc.w 251
+00000BB6= 00FA                    1160      dc.w 250
+00000BB8= 00F9                    1161      dc.w 249
+00000BBA= 00F8                    1162      dc.w 248
+00000BBC= 00F7                    1163      dc.w 247
+00000BBE= 00F6                    1164      dc.w 246
+00000BC0= 00F4                    1165      dc.w 244
+00000BC2= 00F3                    1166      dc.w 243
+00000BC4= 00F2                    1167      dc.w 242
+00000BC6= 00F0                    1168      dc.w 240
+00000BC8= 00EE                    1169      dc.w 238
+00000BCA= 00ED                    1170      dc.w 237
+00000BCC= 00EB                    1171      dc.w 235
+00000BCE= 00E9                    1172      dc.w 233
+00000BD0= 00E8                    1173      dc.w 232
+00000BD2= 00E6                    1174      dc.w 230
+00000BD4= 00E4                    1175      dc.w 228
+00000BD6= 00E2                    1176      dc.w 226
+00000BD8= 00DF                    1177      dc.w 223
+00000BDA= 00DD                    1178      dc.w 221
+00000BDC= 00DB                    1179      dc.w 219
+00000BDE= 00D9                    1180      dc.w 217
+00000BE0= 00D6                    1181      dc.w 214
+00000BE2= 00D4                    1182      dc.w 212
+00000BE4= 00D1                    1183      dc.w 209
+00000BE6= 00CF                    1184      dc.w 207
+00000BE8= 00CC                    1185      dc.w 204
+00000BEA= 00C9                    1186      dc.w 201
+00000BEC= 00C6                    1187      dc.w 198
+00000BEE= 00C4                    1188      dc.w 196
+00000BF0= 00C1                    1189      dc.w 193
+00000BF2= 00BE                    1190      dc.w 190
+00000BF4= 00BB                    1191      dc.w 187
+00000BF6= 00B8                    1192      dc.w 184
+00000BF8= 00B5                    1193      dc.w 181
+00000BFA= 00B1                    1194      dc.w 177
+00000BFC= 00AE                    1195      dc.w 174
+00000BFE= 00AB                    1196      dc.w 171
+00000C00= 00A7                    1197      dc.w 167
+00000C02= 00A4                    1198      dc.w 164
+00000C04= 00A1                    1199      dc.w 161
+00000C06= 009D                    1200      dc.w 157
+00000C08= 009A                    1201      dc.w 154
+00000C0A= 0096                    1202      dc.w 150
+00000C0C= 0092                    1203      dc.w 146
+00000C0E= 008F                    1204      dc.w 143
+00000C10= 008B                    1205      dc.w 139
+00000C12= 0087                    1206      dc.w 135
+00000C14= 0083                    1207      dc.w 131
+00000C16= 007F                    1208      dc.w 127
+00000C18= 007C                    1209      dc.w 124
+00000C1A= 0078                    1210      dc.w 120
+00000C1C= 0074                    1211      dc.w 116
+00000C1E= 0070                    1212      dc.w 112
+00000C20= 006C                    1213      dc.w 108
+00000C22= 0068                    1214      dc.w 104
+00000C24= 0064                    1215      dc.w 100
+00000C26= 005F                    1216      dc.w 95
+00000C28= 005B                    1217      dc.w 91
+00000C2A= 0057                    1218      dc.w 87
+00000C2C= 0053                    1219      dc.w 83
+00000C2E= 004F                    1220      dc.w 79
+00000C30= 004A                    1221      dc.w 74
+00000C32= 0046                    1222      dc.w 70
+00000C34= 0042                    1223      dc.w 66
+00000C36= 003D                    1224      dc.w 61
+00000C38= 0039                    1225      dc.w 57
+00000C3A= 0035                    1226      dc.w 53
+00000C3C= 0030                    1227      dc.w 48
+00000C3E= 002C                    1228      dc.w 44
+00000C40= 0028                    1229      dc.w 40
+00000C42= 0023                    1230      dc.w 35
+00000C44= 001F                    1231      dc.w 31
+00000C46= 001A                    1232      dc.w 26
+00000C48= 0016                    1233      dc.w 22
+00000C4A= 0011                    1234      dc.w 17
+00000C4C= 000D                    1235      dc.w 13
+00000C4E= 0008                    1236      dc.w 8
+00000C50= 0004                    1237      dc.w 4
+00000C52= 0000                    1238      dc.w 0
+00000C54= FFFC                    1239      dc.w -4
+00000C56= FFF8                    1240      dc.w -8
+00000C58= FFF3                    1241      dc.w -13
+00000C5A= FFEF                    1242      dc.w -17
+00000C5C= FFEA                    1243      dc.w -22
+00000C5E= FFE6                    1244      dc.w -26
+00000C60= FFE1                    1245      dc.w -31
+00000C62= FFDD                    1246      dc.w -35
+00000C64= FFD8                    1247      dc.w -40
+00000C66= FFD4                    1248      dc.w -44
+00000C68= FFD0                    1249      dc.w -48
+00000C6A= FFCB                    1250      dc.w -53
+00000C6C= FFC7                    1251      dc.w -57
+00000C6E= FFC3                    1252      dc.w -61
+00000C70= FFBE                    1253      dc.w -66
+00000C72= FFBA                    1254      dc.w -70
+00000C74= FFB6                    1255      dc.w -74
+00000C76= FFB1                    1256      dc.w -79
+00000C78= FFAD                    1257      dc.w -83
+00000C7A= FFA9                    1258      dc.w -87
+00000C7C= FFA5                    1259      dc.w -91
+00000C7E= FFA1                    1260      dc.w -95
+00000C80= FF9C                    1261      dc.w -100
+00000C82= FF98                    1262      dc.w -104
+00000C84= FF94                    1263      dc.w -108
+00000C86= FF90                    1264      dc.w -112
+00000C88= FF8C                    1265      dc.w -116
+00000C8A= FF88                    1266      dc.w -120
+00000C8C= FF84                    1267      dc.w -124
+00000C8E= FF80                    1268      dc.w -128
+00000C90= FF7D                    1269      dc.w -131
+00000C92= FF79                    1270      dc.w -135
+00000C94= FF75                    1271      dc.w -139
+00000C96= FF71                    1272      dc.w -143
+00000C98= FF6E                    1273      dc.w -146
+00000C9A= FF6A                    1274      dc.w -150
+00000C9C= FF66                    1275      dc.w -154
+00000C9E= FF63                    1276      dc.w -157
+00000CA0= FF5F                    1277      dc.w -161
+00000CA2= FF5C                    1278      dc.w -164
+00000CA4= FF59                    1279      dc.w -167
+00000CA6= FF55                    1280      dc.w -171
+00000CA8= FF52                    1281      dc.w -174
+00000CAA= FF4F                    1282      dc.w -177
+00000CAC= FF4B                    1283      dc.w -181
+00000CAE= FF48                    1284      dc.w -184
+00000CB0= FF45                    1285      dc.w -187
+00000CB2= FF42                    1286      dc.w -190
+00000CB4= FF3F                    1287      dc.w -193
+00000CB6= FF3C                    1288      dc.w -196
+00000CB8= FF3A                    1289      dc.w -198
+00000CBA= FF37                    1290      dc.w -201
+00000CBC= FF34                    1291      dc.w -204
+00000CBE= FF31                    1292      dc.w -207
+00000CC0= FF2F                    1293      dc.w -209
+00000CC2= FF2C                    1294      dc.w -212
+00000CC4= FF2A                    1295      dc.w -214
+00000CC6= FF27                    1296      dc.w -217
+00000CC8= FF25                    1297      dc.w -219
+00000CCA= FF23                    1298      dc.w -221
+00000CCC= FF21                    1299      dc.w -223
+00000CCE= FF1E                    1300      dc.w -226
+00000CD0= FF1C                    1301      dc.w -228
+00000CD2= FF1A                    1302      dc.w -230
+00000CD4= FF18                    1303      dc.w -232
+00000CD6= FF17                    1304      dc.w -233
+00000CD8= FF15                    1305      dc.w -235
+00000CDA= FF13                    1306      dc.w -237
+00000CDC= FF12                    1307      dc.w -238
+00000CDE= FF10                    1308      dc.w -240
+00000CE0= FF0E                    1309      dc.w -242
+00000CE2= FF0D                    1310      dc.w -243
+00000CE4= FF0C                    1311      dc.w -244
+00000CE6= FF0A                    1312      dc.w -246
+00000CE8= FF09                    1313      dc.w -247
+00000CEA= FF08                    1314      dc.w -248
+00000CEC= FF07                    1315      dc.w -249
+00000CEE= FF06                    1316      dc.w -250
+00000CF0= FF05                    1317      dc.w -251
+00000CF2= FF04                    1318      dc.w -252
+00000CF4= FF04                    1319      dc.w -252
+00000CF6= FF03                    1320      dc.w -253
+00000CF8= FF02                    1321      dc.w -254
+00000CFA= FF02                    1322      dc.w -254
+00000CFC= FF01                    1323      dc.w -255
+00000CFE= FF01                    1324      dc.w -255
+00000D00= FF01                    1325      dc.w -255
+00000D02= FF01                    1326      dc.w -255
+00000D04= FF01                    1327      dc.w -255
+00000D06= FF01                    1328      dc.w -255
+00000D08= FF01                    1329      dc.w -255
+00000D0A= FF01                    1330      dc.w -255
+00000D0C= FF01                    1331      dc.w -255
+00000D0E= FF01                    1332      dc.w -255
+00000D10= FF01                    1333      dc.w -255
+00000D12= FF02                    1334      dc.w -254
+00000D14= FF02                    1335      dc.w -254
+00000D16= FF03                    1336      dc.w -253
+00000D18= FF04                    1337      dc.w -252
+00000D1A= FF04                    1338      dc.w -252
+00000D1C= FF05                    1339      dc.w -251
+00000D1E= FF06                    1340      dc.w -250
+00000D20= FF07                    1341      dc.w -249
+00000D22= FF08                    1342      dc.w -248
+00000D24= FF09                    1343      dc.w -247
+00000D26= FF0A                    1344      dc.w -246
+00000D28= FF0C                    1345      dc.w -244
+00000D2A= FF0D                    1346      dc.w -243
+00000D2C= FF0E                    1347      dc.w -242
+00000D2E= FF10                    1348      dc.w -240
+00000D30= FF12                    1349      dc.w -238
+00000D32= FF13                    1350      dc.w -237
+00000D34= FF15                    1351      dc.w -235
+00000D36= FF17                    1352      dc.w -233
+00000D38= FF18                    1353      dc.w -232
+00000D3A= FF1A                    1354      dc.w -230
+00000D3C= FF1C                    1355      dc.w -228
+00000D3E= FF1E                    1356      dc.w -226
+00000D40= FF21                    1357      dc.w -223
+00000D42= FF23                    1358      dc.w -221
+00000D44= FF25                    1359      dc.w -219
+00000D46= FF27                    1360      dc.w -217
+00000D48= FF2A                    1361      dc.w -214
+00000D4A= FF2C                    1362      dc.w -212
+00000D4C= FF2F                    1363      dc.w -209
+00000D4E= FF31                    1364      dc.w -207
+00000D50= FF34                    1365      dc.w -204
+00000D52= FF37                    1366      dc.w -201
+00000D54= FF3A                    1367      dc.w -198
+00000D56= FF3C                    1368      dc.w -196
+00000D58= FF3F                    1369      dc.w -193
+00000D5A= FF42                    1370      dc.w -190
+00000D5C= FF45                    1371      dc.w -187
+00000D5E= FF48                    1372      dc.w -184
+00000D60= FF4B                    1373      dc.w -181
+00000D62= FF4F                    1374      dc.w -177
+00000D64= FF52                    1375      dc.w -174
+00000D66= FF55                    1376      dc.w -171
+00000D68= FF59                    1377      dc.w -167
+00000D6A= FF5C                    1378      dc.w -164
+00000D6C= FF5F                    1379      dc.w -161
+00000D6E= FF63                    1380      dc.w -157
+00000D70= FF66                    1381      dc.w -154
+00000D72= FF6A                    1382      dc.w -150
+00000D74= FF6E                    1383      dc.w -146
+00000D76= FF71                    1384      dc.w -143
+00000D78= FF75                    1385      dc.w -139
+00000D7A= FF79                    1386      dc.w -135
+00000D7C= FF7D                    1387      dc.w -131
+00000D7E= FF81                    1388      dc.w -127
+00000D80= FF84                    1389      dc.w -124
+00000D82= FF88                    1390      dc.w -120
+00000D84= FF8C                    1391      dc.w -116
+00000D86= FF90                    1392      dc.w -112
+00000D88= FF94                    1393      dc.w -108
+00000D8A= FF98                    1394      dc.w -104
+00000D8C= FF9C                    1395      dc.w -100
+00000D8E= FFA1                    1396      dc.w -95
+00000D90= FFA5                    1397      dc.w -91
+00000D92= FFA9                    1398      dc.w -87
+00000D94= FFAD                    1399      dc.w -83
+00000D96= FFB1                    1400      dc.w -79
+00000D98= FFB6                    1401      dc.w -74
+00000D9A= FFBA                    1402      dc.w -70
+00000D9C= FFBE                    1403      dc.w -66
+00000D9E= FFC3                    1404      dc.w -61
+00000DA0= FFC7                    1405      dc.w -57
+00000DA2= FFCB                    1406      dc.w -53
+00000DA4= FFD0                    1407      dc.w -48
+00000DA6= FFD4                    1408      dc.w -44
+00000DA8= FFD8                    1409      dc.w -40
+00000DAA= FFDD                    1410      dc.w -35
+00000DAC= FFE1                    1411      dc.w -31
+00000DAE= FFE6                    1412      dc.w -26
+00000DB0= FFEA                    1413      dc.w -22
+00000DB2= FFEF                    1414      dc.w -17
+00000DB4= FFF3                    1415      dc.w -13
+00000DB6= FFF8                    1416      dc.w -8
+00000DB8= FFFC                    1417      dc.w -4
+00000DBA                          1418  
+00000DBA                          1419  
+00000DBA                          1420  CosTable:
+00000DBA= 0100                    1421      dc.w 256
+00000DBC= 00FF                    1422      dc.w 255
+00000DBE= 00FF                    1423      dc.w 255
+00000DC0= 00FF                    1424      dc.w 255
+00000DC2= 00FF                    1425      dc.w 255
+00000DC4= 00FF                    1426      dc.w 255
+00000DC6= 00FE                    1427      dc.w 254
+00000DC8= 00FE                    1428      dc.w 254
+00000DCA= 00FD                    1429      dc.w 253
+00000DCC= 00FC                    1430      dc.w 252
+00000DCE= 00FC                    1431      dc.w 252
+00000DD0= 00FB                    1432      dc.w 251
+00000DD2= 00FA                    1433      dc.w 250
+00000DD4= 00F9                    1434      dc.w 249
+00000DD6= 00F8                    1435      dc.w 248
+00000DD8= 00F7                    1436      dc.w 247
+00000DDA= 00F6                    1437      dc.w 246
+00000DDC= 00F4                    1438      dc.w 244
+00000DDE= 00F3                    1439      dc.w 243
+00000DE0= 00F2                    1440      dc.w 242
+00000DE2= 00F0                    1441      dc.w 240
+00000DE4= 00EE                    1442      dc.w 238
+00000DE6= 00ED                    1443      dc.w 237
+00000DE8= 00EB                    1444      dc.w 235
+00000DEA= 00E9                    1445      dc.w 233
+00000DEC= 00E8                    1446      dc.w 232
+00000DEE= 00E6                    1447      dc.w 230
+00000DF0= 00E4                    1448      dc.w 228
+00000DF2= 00E2                    1449      dc.w 226
+00000DF4= 00DF                    1450      dc.w 223
+00000DF6= 00DD                    1451      dc.w 221
+00000DF8= 00DB                    1452      dc.w 219
+00000DFA= 00D9                    1453      dc.w 217
+00000DFC= 00D6                    1454      dc.w 214
+00000DFE= 00D4                    1455      dc.w 212
+00000E00= 00D1                    1456      dc.w 209
+00000E02= 00CF                    1457      dc.w 207
+00000E04= 00CC                    1458      dc.w 204
+00000E06= 00C9                    1459      dc.w 201
+00000E08= 00C6                    1460      dc.w 198
+00000E0A= 00C4                    1461      dc.w 196
+00000E0C= 00C1                    1462      dc.w 193
+00000E0E= 00BE                    1463      dc.w 190
+00000E10= 00BB                    1464      dc.w 187
+00000E12= 00B8                    1465      dc.w 184
+00000E14= 00B5                    1466      dc.w 181
+00000E16= 00B1                    1467      dc.w 177
+00000E18= 00AE                    1468      dc.w 174
+00000E1A= 00AB                    1469      dc.w 171
+00000E1C= 00A7                    1470      dc.w 167
+00000E1E= 00A4                    1471      dc.w 164
+00000E20= 00A1                    1472      dc.w 161
+00000E22= 009D                    1473      dc.w 157
+00000E24= 009A                    1474      dc.w 154
+00000E26= 0096                    1475      dc.w 150
+00000E28= 0092                    1476      dc.w 146
+00000E2A= 008F                    1477      dc.w 143
+00000E2C= 008B                    1478      dc.w 139
+00000E2E= 0087                    1479      dc.w 135
+00000E30= 0083                    1480      dc.w 131
+00000E32= 007F                    1481      dc.w 127
+00000E34= 007C                    1482      dc.w 124
+00000E36= 0078                    1483      dc.w 120
+00000E38= 0074                    1484      dc.w 116
+00000E3A= 0070                    1485      dc.w 112
+00000E3C= 006C                    1486      dc.w 108
+00000E3E= 0068                    1487      dc.w 104
+00000E40= 0064                    1488      dc.w 100
+00000E42= 005F                    1489      dc.w 95
+00000E44= 005B                    1490      dc.w 91
+00000E46= 0057                    1491      dc.w 87
+00000E48= 0053                    1492      dc.w 83
+00000E4A= 004F                    1493      dc.w 79
+00000E4C= 004A                    1494      dc.w 74
+00000E4E= 0046                    1495      dc.w 70
+00000E50= 0042                    1496      dc.w 66
+00000E52= 003D                    1497      dc.w 61
+00000E54= 0039                    1498      dc.w 57
+00000E56= 0035                    1499      dc.w 53
+00000E58= 0030                    1500      dc.w 48
+00000E5A= 002C                    1501      dc.w 44
+00000E5C= 0028                    1502      dc.w 40
+00000E5E= 0023                    1503      dc.w 35
+00000E60= 001F                    1504      dc.w 31
+00000E62= 001A                    1505      dc.w 26
+00000E64= 0016                    1506      dc.w 22
+00000E66= 0011                    1507      dc.w 17
+00000E68= 000D                    1508      dc.w 13
+00000E6A= 0008                    1509      dc.w 8
+00000E6C= 0004                    1510      dc.w 4
+00000E6E= 0000                    1511      dc.w 0
+00000E70= FFFC                    1512      dc.w -4
+00000E72= FFF8                    1513      dc.w -8
+00000E74= FFF3                    1514      dc.w -13
+00000E76= FFEF                    1515      dc.w -17
+00000E78= FFEA                    1516      dc.w -22
+00000E7A= FFE6                    1517      dc.w -26
+00000E7C= FFE1                    1518      dc.w -31
+00000E7E= FFDD                    1519      dc.w -35
+00000E80= FFD8                    1520      dc.w -40
+00000E82= FFD4                    1521      dc.w -44
+00000E84= FFD0                    1522      dc.w -48
+00000E86= FFCB                    1523      dc.w -53
+00000E88= FFC7                    1524      dc.w -57
+00000E8A= FFC3                    1525      dc.w -61
+00000E8C= FFBE                    1526      dc.w -66
+00000E8E= FFBA                    1527      dc.w -70
+00000E90= FFB6                    1528      dc.w -74
+00000E92= FFB1                    1529      dc.w -79
+00000E94= FFAD                    1530      dc.w -83
+00000E96= FFA9                    1531      dc.w -87
+00000E98= FFA5                    1532      dc.w -91
+00000E9A= FFA1                    1533      dc.w -95
+00000E9C= FF9C                    1534      dc.w -100
+00000E9E= FF98                    1535      dc.w -104
+00000EA0= FF94                    1536      dc.w -108
+00000EA2= FF90                    1537      dc.w -112
+00000EA4= FF8C                    1538      dc.w -116
+00000EA6= FF88                    1539      dc.w -120
+00000EA8= FF84                    1540      dc.w -124
+00000EAA= FF80                    1541      dc.w -128
+00000EAC= FF7D                    1542      dc.w -131
+00000EAE= FF79                    1543      dc.w -135
+00000EB0= FF75                    1544      dc.w -139
+00000EB2= FF71                    1545      dc.w -143
+00000EB4= FF6E                    1546      dc.w -146
+00000EB6= FF6A                    1547      dc.w -150
+00000EB8= FF66                    1548      dc.w -154
+00000EBA= FF63                    1549      dc.w -157
+00000EBC= FF5F                    1550      dc.w -161
+00000EBE= FF5C                    1551      dc.w -164
+00000EC0= FF59                    1552      dc.w -167
+00000EC2= FF55                    1553      dc.w -171
+00000EC4= FF52                    1554      dc.w -174
+00000EC6= FF4F                    1555      dc.w -177
+00000EC8= FF4B                    1556      dc.w -181
+00000ECA= FF48                    1557      dc.w -184
+00000ECC= FF45                    1558      dc.w -187
+00000ECE= FF42                    1559      dc.w -190
+00000ED0= FF3F                    1560      dc.w -193
+00000ED2= FF3C                    1561      dc.w -196
+00000ED4= FF3A                    1562      dc.w -198
+00000ED6= FF37                    1563      dc.w -201
+00000ED8= FF34                    1564      dc.w -204
+00000EDA= FF31                    1565      dc.w -207
+00000EDC= FF2F                    1566      dc.w -209
+00000EDE= FF2C                    1567      dc.w -212
+00000EE0= FF2A                    1568      dc.w -214
+00000EE2= FF27                    1569      dc.w -217
+00000EE4= FF25                    1570      dc.w -219
+00000EE6= FF23                    1571      dc.w -221
+00000EE8= FF21                    1572      dc.w -223
+00000EEA= FF1E                    1573      dc.w -226
+00000EEC= FF1C                    1574      dc.w -228
+00000EEE= FF1A                    1575      dc.w -230
+00000EF0= FF18                    1576      dc.w -232
+00000EF2= FF17                    1577      dc.w -233
+00000EF4= FF15                    1578      dc.w -235
+00000EF6= FF13                    1579      dc.w -237
+00000EF8= FF12                    1580      dc.w -238
+00000EFA= FF10                    1581      dc.w -240
+00000EFC= FF0E                    1582      dc.w -242
+00000EFE= FF0D                    1583      dc.w -243
+00000F00= FF0C                    1584      dc.w -244
+00000F02= FF0A                    1585      dc.w -246
+00000F04= FF09                    1586      dc.w -247
+00000F06= FF08                    1587      dc.w -248
+00000F08= FF07                    1588      dc.w -249
+00000F0A= FF06                    1589      dc.w -250
+00000F0C= FF05                    1590      dc.w -251
+00000F0E= FF04                    1591      dc.w -252
+00000F10= FF04                    1592      dc.w -252
+00000F12= FF03                    1593      dc.w -253
+00000F14= FF02                    1594      dc.w -254
+00000F16= FF02                    1595      dc.w -254
+00000F18= FF01                    1596      dc.w -255
+00000F1A= FF01                    1597      dc.w -255
+00000F1C= FF01                    1598      dc.w -255
+00000F1E= FF01                    1599      dc.w -255
+00000F20= FF01                    1600      dc.w -255
+00000F22= FF01                    1601      dc.w -255
+00000F24= FF01                    1602      dc.w -255
+00000F26= FF01                    1603      dc.w -255
+00000F28= FF01                    1604      dc.w -255
+00000F2A= FF01                    1605      dc.w -255
+00000F2C= FF01                    1606      dc.w -255
+00000F2E= FF02                    1607      dc.w -254
+00000F30= FF02                    1608      dc.w -254
+00000F32= FF03                    1609      dc.w -253
+00000F34= FF04                    1610      dc.w -252
+00000F36= FF04                    1611      dc.w -252
+00000F38= FF05                    1612      dc.w -251
+00000F3A= FF06                    1613      dc.w -250
+00000F3C= FF07                    1614      dc.w -249
+00000F3E= FF08                    1615      dc.w -248
+00000F40= FF09                    1616      dc.w -247
+00000F42= FF0A                    1617      dc.w -246
+00000F44= FF0C                    1618      dc.w -244
+00000F46= FF0D                    1619      dc.w -243
+00000F48= FF0E                    1620      dc.w -242
+00000F4A= FF10                    1621      dc.w -240
+00000F4C= FF12                    1622      dc.w -238
+00000F4E= FF13                    1623      dc.w -237
+00000F50= FF15                    1624      dc.w -235
+00000F52= FF17                    1625      dc.w -233
+00000F54= FF18                    1626      dc.w -232
+00000F56= FF1A                    1627      dc.w -230
+00000F58= FF1C                    1628      dc.w -228
+00000F5A= FF1E                    1629      dc.w -226
+00000F5C= FF21                    1630      dc.w -223
+00000F5E= FF23                    1631      dc.w -221
+00000F60= FF25                    1632      dc.w -219
+00000F62= FF27                    1633      dc.w -217
+00000F64= FF2A                    1634      dc.w -214
+00000F66= FF2C                    1635      dc.w -212
+00000F68= FF2F                    1636      dc.w -209
+00000F6A= FF31                    1637      dc.w -207
+00000F6C= FF34                    1638      dc.w -204
+00000F6E= FF37                    1639      dc.w -201
+00000F70= FF3A                    1640      dc.w -198
+00000F72= FF3C                    1641      dc.w -196
+00000F74= FF3F                    1642      dc.w -193
+00000F76= FF42                    1643      dc.w -190
+00000F78= FF45                    1644      dc.w -187
+00000F7A= FF48                    1645      dc.w -184
+00000F7C= FF4B                    1646      dc.w -181
+00000F7E= FF4F                    1647      dc.w -177
+00000F80= FF52                    1648      dc.w -174
+00000F82= FF55                    1649      dc.w -171
+00000F84= FF59                    1650      dc.w -167
+00000F86= FF5C                    1651      dc.w -164
+00000F88= FF5F                    1652      dc.w -161
+00000F8A= FF63                    1653      dc.w -157
+00000F8C= FF66                    1654      dc.w -154
+00000F8E= FF6A                    1655      dc.w -150
+00000F90= FF6E                    1656      dc.w -146
+00000F92= FF71                    1657      dc.w -143
+00000F94= FF75                    1658      dc.w -139
+00000F96= FF79                    1659      dc.w -135
+00000F98= FF7D                    1660      dc.w -131
+00000F9A= FF81                    1661      dc.w -127
+00000F9C= FF84                    1662      dc.w -124
+00000F9E= FF88                    1663      dc.w -120
+00000FA0= FF8C                    1664      dc.w -116
+00000FA2= FF90                    1665      dc.w -112
+00000FA4= FF94                    1666      dc.w -108
+00000FA6= FF98                    1667      dc.w -104
+00000FA8= FF9C                    1668      dc.w -100
+00000FAA= FFA1                    1669      dc.w -95
+00000FAC= FFA5                    1670      dc.w -91
+00000FAE= FFA9                    1671      dc.w -87
+00000FB0= FFAD                    1672      dc.w -83
+00000FB2= FFB1                    1673      dc.w -79
+00000FB4= FFB6                    1674      dc.w -74
+00000FB6= FFBA                    1675      dc.w -70
+00000FB8= FFBE                    1676      dc.w -66
+00000FBA= FFC3                    1677      dc.w -61
+00000FBC= FFC7                    1678      dc.w -57
+00000FBE= FFCB                    1679      dc.w -53
+00000FC0= FFD0                    1680      dc.w -48
+00000FC2= FFD4                    1681      dc.w -44
+00000FC4= FFD8                    1682      dc.w -40
+00000FC6= FFDD                    1683      dc.w -35
+00000FC8= FFE1                    1684      dc.w -31
+00000FCA= FFE6                    1685      dc.w -26
+00000FCC= FFEA                    1686      dc.w -22
+00000FCE= FFEF                    1687      dc.w -17
+00000FD0= FFF3                    1688      dc.w -13
+00000FD2= FFF8                    1689      dc.w -8
+00000FD4= FFFC                    1690      dc.w -4
+00000FD6= 0000                    1691      dc.w 0
+00000FD8= 0004                    1692      dc.w 4
+00000FDA= 0008                    1693      dc.w 8
+00000FDC= 000D                    1694      dc.w 13
+00000FDE= 0011                    1695      dc.w 17
+00000FE0= 0016                    1696      dc.w 22
+00000FE2= 001A                    1697      dc.w 26
+00000FE4= 001F                    1698      dc.w 31
+00000FE6= 0023                    1699      dc.w 35
+00000FE8= 0028                    1700      dc.w 40
+00000FEA= 002C                    1701      dc.w 44
+00000FEC= 0030                    1702      dc.w 48
+00000FEE= 0035                    1703      dc.w 53
+00000FF0= 0039                    1704      dc.w 57
+00000FF2= 003D                    1705      dc.w 61
+00000FF4= 0042                    1706      dc.w 66
+00000FF6= 0046                    1707      dc.w 70
+00000FF8= 004A                    1708      dc.w 74
+00000FFA= 004F                    1709      dc.w 79
+00000FFC= 0053                    1710      dc.w 83
+00000FFE= 0057                    1711      dc.w 87
+00001000= 005B                    1712      dc.w 91
+00001002= 005F                    1713      dc.w 95
+00001004= 0064                    1714      dc.w 100
+00001006= 0068                    1715      dc.w 104
+00001008= 006C                    1716      dc.w 108
+0000100A= 0070                    1717      dc.w 112
+0000100C= 0074                    1718      dc.w 116
+0000100E= 0078                    1719      dc.w 120
+00001010= 007C                    1720      dc.w 124
+00001012= 0080                    1721      dc.w 128
+00001014= 0083                    1722      dc.w 131
+00001016= 0087                    1723      dc.w 135
+00001018= 008B                    1724      dc.w 139
+0000101A= 008F                    1725      dc.w 143
+0000101C= 0092                    1726      dc.w 146
+0000101E= 0096                    1727      dc.w 150
+00001020= 009A                    1728      dc.w 154
+00001022= 009D                    1729      dc.w 157
+00001024= 00A1                    1730      dc.w 161
+00001026= 00A4                    1731      dc.w 164
+00001028= 00A7                    1732      dc.w 167
+0000102A= 00AB                    1733      dc.w 171
+0000102C= 00AE                    1734      dc.w 174
+0000102E= 00B1                    1735      dc.w 177
+00001030= 00B5                    1736      dc.w 181
+00001032= 00B8                    1737      dc.w 184
+00001034= 00BB                    1738      dc.w 187
+00001036= 00BE                    1739      dc.w 190
+00001038= 00C1                    1740      dc.w 193
+0000103A= 00C4                    1741      dc.w 196
+0000103C= 00C6                    1742      dc.w 198
+0000103E= 00C9                    1743      dc.w 201
+00001040= 00CC                    1744      dc.w 204
+00001042= 00CF                    1745      dc.w 207
+00001044= 00D1                    1746      dc.w 209
+00001046= 00D4                    1747      dc.w 212
+00001048= 00D6                    1748      dc.w 214
+0000104A= 00D9                    1749      dc.w 217
+0000104C= 00DB                    1750      dc.w 219
+0000104E= 00DD                    1751      dc.w 221
+00001050= 00DF                    1752      dc.w 223
+00001052= 00E2                    1753      dc.w 226
+00001054= 00E4                    1754      dc.w 228
+00001056= 00E6                    1755      dc.w 230
+00001058= 00E8                    1756      dc.w 232
+0000105A= 00E9                    1757      dc.w 233
+0000105C= 00EB                    1758      dc.w 235
+0000105E= 00ED                    1759      dc.w 237
+00001060= 00EE                    1760      dc.w 238
+00001062= 00F0                    1761      dc.w 240
+00001064= 00F2                    1762      dc.w 242
+00001066= 00F3                    1763      dc.w 243
+00001068= 00F4                    1764      dc.w 244
+0000106A= 00F6                    1765      dc.w 246
+0000106C= 00F7                    1766      dc.w 247
+0000106E= 00F8                    1767      dc.w 248
+00001070= 00F9                    1768      dc.w 249
+00001072= 00FA                    1769      dc.w 250
+00001074= 00FB                    1770      dc.w 251
+00001076= 00FC                    1771      dc.w 252
+00001078= 00FC                    1772      dc.w 252
+0000107A= 00FD                    1773      dc.w 253
+0000107C= 00FE                    1774      dc.w 254
+0000107E= 00FE                    1775      dc.w 254
+00001080= 00FF                    1776      dc.w 255
+00001082= 00FF                    1777      dc.w 255
+00001084= 00FF                    1778      dc.w 255
+00001086= 00FF                    1779      dc.w 255
+00001088= 00FF                    1780      dc.w 255
+0000108A                          1781  
+0000108A                          1782  SqrtTable:
+0000108A= 0000                    1783      dc.w 0 ;0
+0000108C= 0100                    1784      dc.w 256 ;1
+0000108E= 016A                    1785      dc.w 362 ;2
+00001090= 01BB                    1786      dc.w 443 ;3
+00001092= 0200                    1787      dc.w 512 ;4
+00001094= 023C                    1788      dc.w 572 ;5
+00001096= 0273                    1789      dc.w 627 ;6
+00001098= 02A5                    1790      dc.w 677 ;7
+0000109A= 02D4                    1791      dc.w 724 ;8
+0000109C= 0300                    1792      dc.w 768 ;9
+0000109E= 0329                    1793      dc.w 809 ;10
+000010A0= 0351                    1794      dc.w 849 ;11
+000010A2= 0376                    1795      dc.w 886 ;12
+000010A4= 039B                    1796      dc.w 923 ;13
+000010A6= 03BD                    1797      dc.w 957 ;14
+000010A8= 03DF                    1798      dc.w 991 ;15
+000010AA= 0400                    1799      dc.w 1024 ;16
+000010AC= 041F                    1800      dc.w 1055 ;17
+000010AE= 043E                    1801      dc.w 1086 ;18
+000010B0= 045B                    1802      dc.w 1115 ;19
+000010B2= 0478                    1803      dc.w 1144 ;20
+000010B4= 0495                    1804      dc.w 1173 ;21
+000010B6= 04B0                    1805      dc.w 1200 ;22
+000010B8= 04CB                    1806      dc.w 1227 ;23
+000010BA= 04E6                    1807      dc.w 1254 ;24
+000010BC= 0500                    1808      dc.w 1280 ;25
+000010BE= 0519                    1809      dc.w 1305 ;26
+000010C0= 0532                    1810      dc.w 1330 ;27
+000010C2= 054A                    1811      dc.w 1354 ;28
+000010C4= 0562                    1812      dc.w 1378 ;29
+000010C6= 057A                    1813      dc.w 1402 ;30
+000010C8= 0591                    1814      dc.w 1425 ;31
+000010CA= 05A8                    1815      dc.w 1448 ;32
+000010CC= 05BE                    1816      dc.w 1470 ;33
+000010CE= 05D4                    1817      dc.w 1492 ;34
+000010D0= 05EA                    1818      dc.w 1514 ;35
+000010D2= 0600                    1819      dc.w 1536 ;36
+000010D4= 0615                    1820      dc.w 1557 ;37
+000010D6= 062A                    1821      dc.w 1578 ;38
+000010D8= 063E                    1822      dc.w 1598 ;39
+000010DA= 0653                    1823      dc.w 1619 ;40
+000010DC= 0667                    1824      dc.w 1639 ;41
+000010DE= 067B                    1825      dc.w 1659 ;42
+000010E0= 068E                    1826      dc.w 1678 ;43
+000010E2= 06A2                    1827      dc.w 1698 ;44
+000010E4= 06B5                    1828      dc.w 1717 ;45
+000010E6= 06C8                    1829      dc.w 1736 ;46
+000010E8= 06DB                    1830      dc.w 1755 ;47
+000010EA= 06ED                    1831      dc.w 1773 ;48
+000010EC= 0700                    1832      dc.w 1792 ;49
+000010EE= 0712                    1833      dc.w 1810 ;50
+000010F0= 0724                    1834      dc.w 1828 ;51
+000010F2= 0736                    1835      dc.w 1846 ;52
+000010F4= 0747                    1836      dc.w 1863 ;53
+000010F6= 0759                    1837      dc.w 1881 ;54
+000010F8= 076A                    1838      dc.w 1898 ;55
+000010FA= 077B                    1839      dc.w 1915 ;56
+000010FC= 078C                    1840      dc.w 1932 ;57
+000010FE= 079D                    1841      dc.w 1949 ;58
+00001100= 07AE                    1842      dc.w 1966 ;59
+00001102= 07BE                    1843      dc.w 1982 ;60
+00001104= 07CF                    1844      dc.w 1999 ;61
+00001106= 07DF                    1845      dc.w 2015 ;62
+00001108= 07EF                    1846      dc.w 2031 ;63
+0000110A= 0800                    1847      dc.w 2048 ;64
+0000110C= 080F                    1848      dc.w 2063 ;65
+0000110E= 081F                    1849      dc.w 2079 ;66
+00001110= 082F                    1850      dc.w 2095 ;67
+00001112= 083F                    1851      dc.w 2111 ;68
+00001114= 084E                    1852      dc.w 2126 ;69
+00001116= 085D                    1853      dc.w 2141 ;70
+00001118= 086D                    1854      dc.w 2157 ;71
+0000111A= 087C                    1855      dc.w 2172 ;72
+0000111C= 088B                    1856      dc.w 2187 ;73
+0000111E= 089A                    1857      dc.w 2202 ;74
+00001120= 08A9                    1858      dc.w 2217 ;75
+00001122= 08B7                    1859      dc.w 2231 ;76
+00001124= 08C6                    1860      dc.w 2246 ;77
+00001126= 08D4                    1861      dc.w 2260 ;78
+00001128= 08E3                    1862      dc.w 2275 ;79
+0000112A= 08F1                    1863      dc.w 2289 ;80
+0000112C= 0900                    1864      dc.w 2304 ;81
+0000112E= 090E                    1865      dc.w 2318 ;82
+00001130= 091C                    1866      dc.w 2332 ;83
+00001132= 092A                    1867      dc.w 2346 ;84
+00001134= 0938                    1868      dc.w 2360 ;85
+00001136= 0946                    1869      dc.w 2374 ;86
+00001138= 0953                    1870      dc.w 2387 ;87
+0000113A= 0961                    1871      dc.w 2401 ;88
+0000113C= 096F                    1872      dc.w 2415 ;89
+0000113E= 097C                    1873      dc.w 2428 ;90
+00001140= 098A                    1874      dc.w 2442 ;91
+00001142= 0997                    1875      dc.w 2455 ;92
+00001144= 09A4                    1876      dc.w 2468 ;93
+00001146= 09B2                    1877      dc.w 2482 ;94
+00001148= 09BF                    1878      dc.w 2495 ;95
+0000114A= 09CC                    1879      dc.w 2508 ;96
+0000114C= 09D9                    1880      dc.w 2521 ;97
+0000114E= 09E6                    1881      dc.w 2534 ;98
+00001150= 09F3                    1882      dc.w 2547 ;99
+00001152= 0A00                    1883      dc.w 2560 ;100
+00001154= 0A0C                    1884      dc.w 2572 ;101
+00001156= 0A19                    1885      dc.w 2585 ;102
+00001158= 0A26                    1886      dc.w 2598 ;103
+0000115A= 0A32                    1887      dc.w 2610 ;104
+0000115C= 0A3F                    1888      dc.w 2623 ;105
+0000115E= 0A4B                    1889      dc.w 2635 ;106
+00001160= 0A58                    1890      dc.w 2648 ;107
+00001162= 0A64                    1891      dc.w 2660 ;108
+00001164= 0A70                    1892      dc.w 2672 ;109
+00001166= 0A7C                    1893      dc.w 2684 ;110
+00001168= 0A89                    1894      dc.w 2697 ;111
+0000116A= 0A95                    1895      dc.w 2709 ;112
+0000116C= 0AA1                    1896      dc.w 2721 ;113
+0000116E= 0AAD                    1897      dc.w 2733 ;114
+00001170= 0AB9                    1898      dc.w 2745 ;115
+00001172= 0AC5                    1899      dc.w 2757 ;116
+00001174= 0AD1                    1900      dc.w 2769 ;117
+00001176= 0ADC                    1901      dc.w 2780 ;118
+00001178= 0AE8                    1902      dc.w 2792 ;119
+0000117A= 0AF4                    1903      dc.w 2804 ;120
+0000117C= 0B00                    1904      dc.w 2816 ;121
+0000117E= 0B0B                    1905      dc.w 2827 ;122
+00001180= 0B17                    1906      dc.w 2839 ;123
+00001182= 0B22                    1907      dc.w 2850 ;124
+00001184= 0B2E                    1908      dc.w 2862 ;125
+00001186= 0B39                    1909      dc.w 2873 ;126
+00001188= 0B44                    1910      dc.w 2884 ;127
+0000118A= 0B50                    1911      dc.w 2896 ;128
+0000118C= 0B5B                    1912      dc.w 2907 ;129
+0000118C= 0B5B                    1913  -------------------- end include --------------------
+0000118E                          1914      INCLUDE "source/ball.asm"
+0000118E                          1915  ; ++++++ STRUCT ++++++
+0000118E                          1916  ; Ball 
+0000118E                          1917  ;
+0000118E                          1918  ; size  = 32 bytes 
+0000118E                          1919  ; 
+0000118E                          1920  ; 0(Ball)  = x position (24.8)
+0000118E                          1921  ; 4(Ball)  = y position (24.8)
+0000118E                          1922  ; 8(Ball)  = width (24.8)
+0000118E                          1923  ; 12(Ball) = height (24.8)
+0000118E                          1924  ; 16(Ball) = x velocity (24.8)
+0000118E                          1925  ; 20(Ball) = y velocity (24.8)
+0000118E                          1926  ; ++++++++++++++++++++
+0000118E  =00000000               1927  M_BALL_RECT   EQU 0 
+0000118E  =00000000               1928  M_BALL_X      EQU 0 
+0000118E  =00000004               1929  M_BALL_Y      EQU 4 
+0000118E  =00000008               1930  M_BALL_WIDTH  EQU 8 
+0000118E  =0000000C               1931  M_BALL_HEIGHT EQU 12 
+0000118E  =00000010               1932  M_BALL_XVEL   EQU 16 
+0000118E  =00000014               1933  M_BALL_YVEL   EQU 20 
+0000118E                          1934  
+0000118E                          1935  ; ------ SUBROUTINE ------
+0000118E                          1936  ; Ball_Init
+0000118E                          1937  ;
+0000118E                          1938  ; Initializes a ball struct with standard 
+0000118E                          1939  ; starting values
+0000118E                          1940  ; 
+0000118E                          1941  ; Input:
+0000118E                          1942  ;   a0.l = pointer to ball struct 
+0000118E                          1943  ; ------------------------  
+0000118E                          1944  Ball_Init:
+0000118E  217C 00000000 0000      1945      move.l #0, M_BALL_X(a0)
+00001196  217C 00000000 0004      1946      move.l #0, M_BALL_Y(a0)
+0000119E  217C 00000800 0008      1947      move.l #BALL_WIDTH, M_BALL_WIDTH(a0)
+000011A6  217C 00000800 000C      1948      move.l #BALL_HEIGHT, M_BALL_HEIGHT(a0)
+000011AE  217C 00000000 0010      1949      move.l #0, M_BALL_XVEL(a0)
+000011B6  217C 00000000 0014      1950      move.l #0, M_BALL_YVEL(a0)
+000011BE  4E75                    1951      rts 
+000011C0                          1952  
+000011C0                          1953  ; ------ SUBROUTINE ------
+000011C0                          1954  ; Ball_Update
+000011C0                          1955  ;
+000011C0                          1956  ; Applies gravity to the ball. Updates the position
+000011C0                          1957  ; of the ball. And handles conflicts with any pegs.
+000011C0                          1958  ; 
+000011C0                          1959  ; Input:
+000011C0                          1960  ;   a0.l = pointer to ball struct 
+000011C0                          1961  ; ------------------------  
+000011C0                          1962  Ball_Update:
+000011C0                          1963  
+000011C0  2F08                    1964      move.l a0, -(sp)
+000011C2  4EB9 00001262           1965      jsr Ball_Hide
+000011C8  205F                    1966      move.l (sp)+, a0
+000011CA                          1967  
+000011CA                          1968      ; Apply gravity 
+000011CA  2028 0014               1969      move.l M_BALL_YVEL(a0), d0 
+000011CE  7212                    1970      move.l #GRAVITY, d1 
+000011D0  D081                    1971      add.l d1, d0 
+000011D2  2140 0014               1972      move.l d0, M_BALL_YVEL(a0)
+000011D6                          1973      
+000011D6                          1974      ; Update the position of ball
+000011D6  2028 0010               1975      move.l M_BALL_XVEL(a0), d0 
+000011DA  2228 0000               1976      move.l M_BALL_X(a0), d1 
+000011DE  D280                    1977      add.l d0, d1 
+000011E0  2141 0000               1978      move.l d1, M_BALL_X(a0)
+000011E4                          1979      
+000011E4  2028 0014               1980      move.l M_BALL_YVEL(a0), d0 
+000011E8  2228 0004               1981      move.l M_BALL_Y(a0), d1 
+000011EC  D280                    1982      add.l d0, d1 
+000011EE  2141 0004               1983      move.l d1, M_BALL_Y(a0)
+000011F2                          1984      
+000011F2                          1985      ; Check if ball goes past left or right bounds 
+000011F2  2028 0000               1986      move.l M_BALL_X(a0), d0 
+000011F6  0C80 00000000           1987      cmpi.l #LEFT_BOUND, d0 
+000011FC  6D00 0012               1988      blt .bounce_left
+00001200  0C80 00013800           1989      cmpi.l #RIGHT_BOUND, d0 
+00001206  6E00 0016               1990      bgt .bounce_right
+0000120A  4EF9 00001230           1991      jmp .check_collisions 
+00001210                          1992      
+00001210                          1993  .bounce_left
+00001210  217C 00000000 0000      1994      move.l #LEFT_BOUND, M_BALL_X(a0)
+00001218  4EF9 00001226           1995      jmp .reverse_xvel
+0000121E                          1996      
+0000121E                          1997  .bounce_right 
+0000121E  217C 00013800 0000      1998      move.l #RIGHT_BOUND, M_BALL_X(a0)
+00001226                          1999      ; jmp .reverse_xvel
+00001226                          2000  
+00001226                          2001  .reverse_xvel
+00001226  2028 0010               2002      move.l M_BALL_XVEL(a0), d0 
+0000122A  4480                    2003      neg.l d0 
+0000122C  2140 0010               2004      move.l d0, M_BALL_XVEL(a0)
+00001230                          2005      
+00001230                          2006  .check_collisions
+00001230                          2007      ; Lastly, check for any peg collisions 
+00001230  2F08                    2008      move.l a0, -(sp)            ; save a0
+00001232  4EB9 0000128A           2009      jsr _Ball_CheckPegCollisions
+00001238  205F                    2010      move.l (sp)+, a0              ; restore a0 
+0000123A                          2011      
+0000123A                          2012  .update_sprite
+0000123A                          2013      ; Update sprite 
+0000123A                          2014      ; don't worry about a0 getting trashed
+0000123A                          2015      ; as this will be the last step of Update
+0000123A  4EB9 00001242           2016      jsr Ball_Draw
+00001240                          2017      
+00001240  4E75                    2018      rts 
+00001242                          2019  
+00001242                          2020  ; ------ SUBROUTINE ------
+00001242                          2021  ; Ball_Draw
+00001242                          2022  ;
+00001242                          2023  ; Draws the ball at location x/y.
+00001242                          2024  ; 
+00001242                          2025  ; Input:
+00001242                          2026  ;   a0.l = pointer to ball struct 
+00001242                          2027  ; ------------------------  
+00001242                          2028  Ball_Draw:
+00001242  7000                    2029      move.l #0, d0             ; param d0: chunk x coordinate
+00001244  7200                    2030      move.l #0, d1             ; param d1: chunk y coordinate 
+00001246  7408                    2031      move.l #8, d2            ; param d2: chunk width 
+00001248  7608                    2032      move.l #8, d3            ; param d3: chunk height 
+0000124A  2828 0000               2033      move.l M_BALL_X(a0), d4  ; param d4: screen x coordinate
+0000124E  E084                    2034      asr.l #8, d4              ; convert from fixed to int 
+00001250  2A28 0004               2035      move.l M_BALL_Y(a0), d5  ; param d5: screen y coordinate 
+00001254  E085                    2036      asr.l #8, d5              ; convert from fixed to int 
+00001256  41F9 0000A360           2037      lea BallBitmap, a0       ; param a0: pointer to bitmap file data
+0000125C  4EB8 04A2               2038      jsr RenderBitmap16 
+00001260  4E75                    2039      rts 
+00001262                          2040      
+00001262                          2041  Ball_Hide:
+00001262  2028 0000               2042      move.l M_BALL_X(a0), d0  ; param d0: chunk x coordinate
+00001266  E080                    2043      asr.l #8, d0              ; convert from fixed to int 
+00001268  2228 0004               2044      move.l M_BALL_Y(a0), d1  ; param d1: chunk y coordinate
+0000126C  E081                    2045      asr.l #8, d1              ; convert from fixed to int     
+0000126E  7408                    2046      move.l #8, d2            ; param d2: chunk width 
+00001270  7608                    2047      move.l #8, d3            ; param d3: chunk height 
+00001272  2828 0000               2048      move.l M_BALL_X(a0), d4  ; param d4: screen x coordinate
+00001276  E084                    2049      asr.l #8, d4              ; convert from fixed to int 
+00001278  2A28 0004               2050      move.l M_BALL_Y(a0), d5  ; param d5: screen y coordinate 
+0000127C  E085                    2051      asr.l #8, d5              ; convert from fixed to int 
+0000127E  41F9 0000A50C           2052      lea BGBitmap, a0          ; param a0: pointer to bitmap file data
+00001284  4EB8 04A2               2053      jsr RenderBitmap16 
+00001288  4E75                    2054      rts 
+0000128A                          2055  
+0000128A                          2056  ; ------ SUBROUTINE ------
+0000128A                          2057  ; _Ball_CheckPegCollisions
+0000128A                          2058  ;
+0000128A                          2059  ; Private subroutine that iterates through 
+0000128A                          2060  ; the peg list and checks if the ball is
+0000128A                          2061  ; overlapping any pegs. Handles collision 
+0000128A                          2062  ; when ball is overlapping a peg.
+0000128A                          2063  ;
+0000128A                          2064  ; Input:
+0000128A                          2065  ;   a0.l = pointer to ball struct 
+0000128A                          2066  ; ------------------------      
+0000128A                          2067  _Ball_CheckPegCollisions:
+0000128A                          2068      
+0000128A                          2069  REGS REG a0/a1/d0 
+0000128A                          2070  
+0000128A  43F8 0006               2071      lea Pegs, a1            ; get the peg array 
+0000128E  4280                    2072      clr.l d0                ; d0 = loop counter 
+00001290                          2073      
+00001290                          2074  .loop
+00001290                          2075      
+00001290  1229 0011               2076      move.b M_PEG_ACTIVE(a1), d1 
+00001294  4A01                    2077      tst.b d1
+00001296  6700 00C2               2078      beq .continue           ; continue if peg is inactive 
+0000129A                          2079      
+0000129A                          2080      ; Otherwise, peg is active. So check if the ball 
+0000129A                          2081      ; is hitting it. 
+0000129A                          2082      ; save regs 
+0000129A  48E7 80C0               2083      movem.l REGS, -(sp) 
+0000129E  4EB9 00001498           2084      jsr Rect_OverlapsRect
+000012A4  2200                    2085      move.l d0, d1           ; save result in d1 
+000012A6                          2086      ; restore regs 
+000012A6  4CDF 0301               2087      movem.l (sp)+, REGS
+000012AA                          2088      
+000012AA  4A81                    2089      tst.l d1 
+000012AC  6700 00AC               2090      beq .continue 
+000012B0                          2091      
+000012B0                          2092      ; So after a bunch of testing and experimenting, I've decided to 
+000012B0                          2093      ; use a very basic collision model where the ball bounces in the 
+000012B0                          2094      ; exact same direct as the vector between the ball's position 
+000012B0                          2095      ; and the peg's position. 
+000012B0                          2096      
+000012B0                          2097      ; Calculate the displacement vector (dispVec)
+000012B0                          2098      ; The dispVec is the vector difference of the 
+000012B0                          2099      ; positions of the ball and peg. The dispVec is 
+000012B0                          2100      ; important because it shows what direction the ball 
+000012B0                          2101      ; is from the peg.
+000012B0  2228 0000               2102      move.l M_BALL_X(a0), d1 
+000012B4  2428 0004               2103      move.l M_BALL_Y(a0), d2
+000012B8  2629 0000               2104      move.l M_PEG_X(a1), d3 
+000012BC  2829 0004               2105      move.l M_PEG_Y(a1), d4 
+000012C0                          2106      
+000012C0                          2107      ; subtract peg pos from ball pos 
+000012C0  9283                    2108      sub.l d3, d1
+000012C2  9484                    2109      sub.l d4, d2                ; <d1, d2> is the displacement vector now
+000012C4                          2110      
+000012C4  2628 0010               2111      move.l M_BALL_XVEL(a0), d3 
+000012C8  2828 0014               2112      move.l M_BALL_YVEL(a0), d4  ; <d3, d4> is the velocity vector 
+000012CC                          2113      
+000012CC                          2114      ; Get the magnitude of the velocity 
+000012CC  2A03                    2115      move.l d3, d5 
+000012CE  C7C5                    2116      muls d5, d3     ; square the xvel
+000012D0  E083                    2117      asr.l #8, d3    ; return to 24.8 format 
+000012D2  2A04                    2118      move.l d4, d5 
+000012D4  C9C5                    2119      muls d5, d4     ; square the yvel 
+000012D6  E084                    2120      asr.l #8, d4    ; return to 24.8 format 
+000012D8  D684                    2121      add.l d4, d3    ; add the squares of the x/y components 
+000012DA                          2122      
+000012DA                          2123      ; clamp the magnitude so it stays within sqrt table 
+000012DA  E083                    2124      asr.l #8, d3             ; convert to int 
+000012DC  0C83 00000080           2125      cmpi.l #MAX_SQRT_INPUT,d3 
+000012E2  6500 0008               2126      blo .no_vel_clamp
+000012E6  263C 00000080           2127      move.l #MAX_SQRT_INPUT, d3 
+000012EC                          2128  .no_vel_clamp
+000012EC  E383                    2129      asl.l #1, d3 
+000012EE  47F8 108A               2130      lea SqrtTable, a3 
+000012F2  D7C3                    2131      add.l d3, a3 
+000012F4  4283                    2132      clr.l d3 
+000012F6  3613                    2133      move.w (a3), d3   ; d3 = magnitude of velocity 
+000012F8                          2134      
+000012F8                          2135      ; Dampen the velocity a tiny bit for some realistic collision 
+000012F8  283C 000000E0           2136      move.l #DAMPENING_COEFFICIENT, d4 
+000012FE  C7C4                    2137      muls d4, d3       
+00001300  E083                    2138      asr.l #8, d3        ; d3 = the new speed of the ball
+00001302                          2139      
+00001302                          2140      ; Normalize the displacement vector for performing projection 
+00001302                          2141      ; first step is to get magnitude squared 
+00001302  2A01                    2142      move.l d1, d5 
+00001304  CBC1                    2143      muls d1, d5
+00001306  E085                    2144      asr.l #8, d5 
+00001308  2C02                    2145      move.l d2, d6
+0000130A  CDC2                    2146      muls d2, d6 
+0000130C  E086                    2147      asr.l #8, d6
+0000130E  DA86                    2148      add.l d6, d5        ; d5 = magnitude squared 
+00001310                          2149      
+00001310                          2150      ; Next step to normalizing is to find the magnitude (sqrt of magnitude squared)
+00001310  E085                    2151      asr.l #8, d5        ; convert mag squared from 24.8 to int 
+00001312  0C85 00000080           2152      cmpi.l #MAX_SQRT_INPUT, d5 
+00001318  6500 0008               2153      blo .skip_mag_clamp
+0000131C  2A3C 00000080           2154      move.l #MAX_SQRT_INPUT, d5  ; clamp if outside of table index range 
+00001322                          2155  .skip_mag_clamp
+00001322  E38D                    2156      lsl.l #1, d5                ; get the index into the sqrt table in bytes 
+00001324  47F8 108A               2157      lea SqrtTable, a3 
+00001328  D7C5                    2158      add.l d5, a3 
+0000132A  4285                    2159      clr.l d5                    ; clear the long because we are about to store a positive word in this reg 
+0000132C  3A13                    2160      move.w (a3), d5             ; d5 = magnitude 
+0000132E                          2161      
+0000132E                          2162      ; Last step of normalizing is to divide dispVec by the magnitude 
+0000132E  E181                    2163      asl.l #8, d1        ; the divors can be in 16.16 format 
+00001330  E182                    2164      asl.l #8, d2 
+00001332  83C5                    2165      divs d5, d1 
+00001334  85C5                    2166      divs d5, d2 
+00001336  48C1                    2167      ext.l d1            ; now d1 should be in 24.8
+00001338  48C2                    2168      ext.l d2            ; and d2 should be in 24.8
+0000133A                          2169      
+0000133A                          2170      ; <d1, d2> = the normalized displacement vector 
+0000133A                          2171      ; Now (for basic collision) we can just multiply the dampened velocity 
+0000133A                          2172      ; with the normalized displacement vector and then set that as the new 
+0000133A                          2173      ; xvel/yvel of the ball. 
+0000133A  C3C3                    2174      muls d3, d1
+0000133C  E081                    2175      asr.l #8, d1 
+0000133E  C5C3                    2176      muls d3, d2
+00001340  E082                    2177      asr.l #8, d2 
+00001342                          2178      
+00001342  2141 0010               2179      move.l d1, M_BALL_XVEL(a0)
+00001346  2142 0014               2180      move.l d2, M_BALL_YVEL(a0)
+0000134A                          2181      
+0000134A                          2182      ; Consume the peg! omnom (deactivate it and add to score)
+0000134A  48E7 80C0               2183      movem.l REGS, -(sp) 
+0000134E  2049                    2184      move.l a1, a0         ; put peg into a0 for param 
+00001350  4EB9 00001412           2185      jsr Peg_Consume 
+00001356  4CDF 0301               2186      movem.l (sp)+, REGS 
+0000135A                          2187      
+0000135A                          2188  .continue
+0000135A  D3FC 00000020           2189      adda.l #PEG_DATA_SIZE, a1 
+00001360  5280                    2190      addq.l #1, d0 
+00001362  B0B8 041E               2191      cmp.l LevelPegCount, d0 
+00001366  6600 FF28               2192      bne .loop 
+0000136A                          2193      
+0000136A  4E75                    2194      rts 
+0000136A  4E75                    2195  -------------------- end include --------------------
+0000136C                          2196      INCLUDE "source/peg.asm"
+0000136C                          2197  ; ++++++ STRUCT ++++++
+0000136C                          2198  ; Peg  
+0000136C                          2199  ;
+0000136C                          2200  ; size  = 32 bytes 
+0000136C                          2201  ; 
+0000136C                          2202  ; 0(Peg)  = x position (24.8 long)
+0000136C                          2203  ; 4(Peg)  = y position (24.8 long)
+0000136C                          2204  ; 8(Peg)  = width (24.8 long)
+0000136C                          2205  ; 12(Peg) = height (24.8 long)
+0000136C                          2206  ; 16(Peg) = type (byte)
+0000136C                          2207  ; 17(Peg) = active (byte)
+0000136C                          2208  ; 18(Peg) = moving (byte)
+0000136C                          2209  ; 19(Peg) = sprite index (byte)
+0000136C                          2210  ; 20(Peg) = left bound (word)
+0000136C                          2211  ; 22(Peg) = right bound (word)
+0000136C                          2212  ; ++++++++++++++++++++
+0000136C  =00000000               2213  M_PEG_RECT         EQU 0 
+0000136C  =00000000               2214  M_PEG_X            EQU 0 
+0000136C  =00000004               2215  M_PEG_Y            EQU 4 
+0000136C  =00000008               2216  M_PEG_WIDTH        EQU 8 
+0000136C  =0000000C               2217  M_PEG_HEIGHT       EQU 12 
+0000136C  =00000010               2218  M_PEG_TYPE         EQU 16 
+0000136C  =00000011               2219  M_PEG_ACTIVE       EQU 17
+0000136C  =00000012               2220  M_PEG_MOVING       EQU 18 
+0000136C  =00000013               2221  M_PEG_SPRITE_INDEX EQU 19
+0000136C  =00000014               2222  M_PEG_LEFT_BOUND   EQU 20 
+0000136C  =00000016               2223  M_PEG_RIGHT_BOUND  EQU 22 
+0000136C                          2224  
+0000136C                          2225  
+0000136C                          2226  ; ------ SUBROUTINE ------
+0000136C                          2227  ; Peg_Init
+0000136C                          2228  ;
+0000136C                          2229  ; Initializes a peg struct with standard 
+0000136C                          2230  ; starting values. Defaults active to 0 
+0000136C                          2231  ; 
+0000136C                          2232  ; Input:
+0000136C                          2233  ;   a0.l = pointer to peg struct 
+0000136C                          2234  ; ------------------------  
+0000136C                          2235  Peg_Init:
+0000136C                          2236  
+0000136C  217C FFFF9400 0000      2237      move.l #PEG_INIT_X, M_PEG_X(a0) 
+00001374  217C FFFF9400 0004      2238      move.l #PEG_INIT_Y, M_PEG_Y(a0)
+0000137C  217C 00000800 0008      2239      move.l #PEG_WIDTH, M_PEG_WIDTH(a0)
+00001384  217C 00000800 000C      2240      move.l #PEG_HEIGHT, M_PEG_HEIGHT(a0)
+0000138C                          2241      
+0000138C  117C 0000 0010          2242      move.b #PEG_TYPE_BLUE, M_PEG_TYPE(a0)
+00001392  117C 0000 0011          2243      move.b #0, M_PEG_ACTIVE(a0)
+00001398  117C 0000 0012          2244      move.b #0, M_PEG_MOVING(a0)
+0000139E  117C 0002 0013          2245      move.b #PEGS_SPRITE_INDEX, M_PEG_SPRITE_INDEX(a0)
+000013A4                          2246      
+000013A4  317C 0000 0014          2247      move.w #0, M_PEG_LEFT_BOUND(a0)
+000013AA  317C 0000 0016          2248      move.w #0, M_PEG_RIGHT_BOUND(a0)
+000013B0                          2249      
+000013B0  4E75                    2250      rts 
+000013B2                          2251  
+000013B2                          2252  ; ------ SUBROUTINE ------
+000013B2                          2253  ; Peg_Draw
+000013B2                          2254  ;
+000013B2                          2255  ; Draws the peg.
+000013B2                          2256  ; 
+000013B2                          2257  ; Input:
+000013B2                          2258  ;   a0.l = pointer to peg struct 
+000013B2                          2259  ; ------------------------      
+000013B2                          2260  Peg_Draw:
+000013B2                          2261  
+000013B2                          2262      ; Example usage of RenderBitmap16
+000013B2  7000                    2263      move.l #0, d0             ; param d0: chunk x coordinate
+000013B4  7200                    2264      move.l #0, d1             ; param d1: chunk y coordinate 
+000013B6  7408                    2265      move.l #8, d2            ; param d2: chunk width 
+000013B8  7608                    2266      move.l #8, d3            ; param d3: chunk height 
+000013BA  2828 0000               2267      move.l M_PEG_X(a0), d4  ; param d4: screen x coordinate
+000013BE  E084                    2268      asr.l #8, d4 
+000013C0  2A28 0004               2269      move.l M_PEG_Y(a0), d5  ; param d5: screen y coordinate 
+000013C4  E085                    2270      asr.l #8, d5
+000013C6  1E28 0010               2271      move.b M_PEG_TYPE(a0), d7
+000013CA  0C07 0001               2272      cmpi.b #PEG_TYPE_RED, d7 
+000013CE  6600 000E               2273      bne .blue_peg
+000013D2  41F9 0000A234           2274      lea RedPegBitmap, a0 
+000013D8  4EF9 000013E4           2275      jmp .render
+000013DE                          2276  .blue_peg
+000013DE  41F9 0000A2CA           2277      lea BluePegBitmap, a0       ; param a0: pointer to bitmap file data
+000013E4                          2278  .render
+000013E4  4EB8 04A2               2279      jsr RenderBitmap16 
+000013E8                          2280      
+000013E8  4E75                    2281      rts 
+000013EA                          2282  
+000013EA                          2283  ; ------ SUBROUTINE ------
+000013EA                          2284  ; Peg_Hide
+000013EA                          2285  ;
+000013EA                          2286  ; Hides the peg by drawing the 
+000013EA                          2287  ; background over the the peg 
+000013EA                          2288  ; 
+000013EA                          2289  ; Input:
+000013EA                          2290  ;   a0.l = pointer to peg struct 
+000013EA                          2291  ; ------------------------         
+000013EA                          2292  Peg_Hide:
+000013EA                          2293  
+000013EA                          2294      ; Example usage of RenderBitmap16
+000013EA  2028 0000               2295      move.l M_PEG_X(a0), d0  ; param d0: chunk x coordinate
+000013EE  E080                    2296      asr.l #8, d0 
+000013F0  2228 0004               2297      move.l M_PEG_Y(a0), d1  ; param d1: chunk y coordinate 
+000013F4  E081                    2298      asr.l #8, d1 
+000013F6  7408                    2299      move.l #8, d2            ; param d2: chunk width 
+000013F8  7608                    2300      move.l #8, d3            ; param d3: chunk height 
+000013FA  2828 0000               2301      move.l M_PEG_X(a0), d4  ; param d4: screen x coordinate
+000013FE  E084                    2302      asr.l #8, d4 
+00001400  2A28 0004               2303      move.l M_PEG_Y(a0), d5  ; param d5: screen y coordinate 
+00001404  E085                    2304      asr.l #8, d5 
+00001406  41F9 0000A50C           2305      lea BGBitmap, a0          ; param a0: pointer to bitmap file data
+0000140C  4EB8 04A2               2306      jsr RenderBitmap16 
+00001410  4E75                    2307      rts 
+00001412                          2308  
+00001412                          2309  ; ------ SUBROUTINE ------
+00001412                          2310  ; Peg_Consume
+00001412                          2311  ;
+00001412                          2312  ; Deactivates the peg and adds to the score
+00001412                          2313  ; based on RedPegCount
+00001412                          2314  ; 
+00001412                          2315  ; Input:
+00001412                          2316  ;   a0.l = pointer to peg struct 
+00001412                          2317  ; ------------------------  
+00001412                          2318  Peg_Consume:
+00001412                          2319  
+00001412                          2320      ; Now mark the peg as inactive and hide the sprite 
+00001412  117C 0000 0011          2321      move.b #0, M_PEG_ACTIVE(a0)
+00001418                          2322      
+00001418                          2323      ; Draw background over where this peg was 
+00001418  2F08                    2324      move.l a0, -(sp)
+0000141A  4EB8 13EA               2325      jsr Peg_Hide 
+0000141E  205F                    2326      move.l (sp)+, a0 
+00001420                          2327      
+00001420                          2328      ; Check if peg was a red peg, if so, dec the 
+00001420                          2329      ; global red peg count 
+00001420  1228 0010               2330      move.b M_PEG_TYPE(a0), d1
+00001424  0C01 0001               2331      cmpi.b #PEG_TYPE_RED, d1 
+00001428  6600 0016               2332      bne .blue_peg  
+0000142C  2238 0432               2333      move.l RedPegCount, d1 
+00001430  5381                    2334      subq.l #1, d1 
+00001432  21C1 0432               2335      move.l d1, RedPegCount      ; reduce the number of red pegs 
+00001436                          2336      
+00001436                          2337      ; Add red peg score 
+00001436  54B8 043A               2338      add.l #RED_PEG_SCORE, Score 
+0000143A  4EF9 00001470           2339      jmp .return 
+00001440                          2340      
+00001440                          2341  .blue_peg 
+00001440  2038 0432               2342      move.l RedPegCount, d0
+00001444  0C80 00000002           2343      cmpi.l #LOW_RED, d0 
+0000144A  6E00 000C               2344      bgt .not_low 
+0000144E                          2345      
+0000144E                          2346      ; Only 1 or 2 red pegs left. Add 4 points 
+0000144E  58B8 043A               2347      addi.l #BLUE_PEG_LOW_SCORE, Score 
+00001452  4EF9 00001470           2348      jmp .return 
+00001458                          2349      
+00001458                          2350  .not_low 
+00001458  0C80 00000006           2351      cmpi.l #MID_RED, d0 
+0000145E  6E00 000C               2352      bgt .not_mid 
+00001462  54B8 043A               2353      addi.l #BLUE_PEG_MID_SCORE, Score 
+00001466  4EF9 00001470           2354      jmp .return 
+0000146C                          2355      
+0000146C                          2356  .not_mid 
+0000146C                          2357      ; Okay, so there are still a lot of red pegs on the 
+0000146C                          2358      ; board. Only reward 1 point.
+0000146C  52B8 043A               2359      addi.l #BLUE_PEG_HIGH_SCORE, Score 
+00001470                          2360      
+00001470                          2361  .return 
+00001470                          2362      
+00001470  4EB8 0A86               2363      jsr DrawScore 
+00001474  4E75                    2364      rts 
+00001474  4E75                    2365  -------------------- end include --------------------
+00001476                          2366      INCLUDE "source/rect.asm"
+00001476                          2367  ; ++++++ STRUCT ++++++
+00001476                          2368  ; Rect  
+00001476                          2369  ;
+00001476                          2370  ; size  = 16 bytes 
+00001476                          2371  ; 
+00001476                          2372  ; 0(Rect)  = x position (24.8 long)
+00001476                          2373  ; 4(Rect)  = y position (24.8 long)
+00001476                          2374  ; 8(Rect)  = width (24.8 long)
+00001476                          2375  ; 12(Rect) = height (24.8 long)
+00001476                          2376  ; ++++++++++++++++++++
+00001476  =00000000               2377  M_RECT_X            EQU 0 
+00001476  =00000004               2378  M_RECT_Y            EQU 4 
+00001476  =00000008               2379  M_RECT_WIDTH        EQU 8 
+00001476  =0000000C               2380  M_RECT_HEIGHT       EQU 12 
+00001476                          2381  
+00001476                          2382  ; ------ SUBROUTINE ------
+00001476                          2383  ; Rect_Init
+00001476                          2384  ;
+00001476                          2385  ; Initializes a rect struct with standard 
+00001476                          2386  ; starting values. 
+00001476                          2387  ; 
+00001476                          2388  ; Input:
+00001476                          2389  ;   a0.l = pointer to rect struct 
+00001476                          2390  ; ------------------------  
+00001476                          2391  Rect_Init:
+00001476  217C 00000000 0000      2392      move.l #$0, M_RECT_X(a0)
+0000147E  217C 00000000 0004      2393      move.l #$0, M_RECT_Y(a0)
+00001486  217C 00000100 0008      2394      move.l #(1*TO_FIXED), M_RECT_WIDTH(a0)
+0000148E  217C 00000100 000C      2395      move.l #(1*TO_FIXED), M_RECT_HEIGHT(a0)
+00001496  4E75                    2396      rts 
+00001498                          2397  
+00001498                          2398  
+00001498                          2399  ; ------ SUBROUTINE ------
+00001498                          2400  ; OverlapsRect
+00001498                          2401  ;
+00001498                          2402  ; Checks if this rect struct overlaps
+00001498                          2403  ; another rect struct 
+00001498                          2404  ; 
+00001498                          2405  ; Input:
+00001498                          2406  ;   a0.l = pointer to this rect 
+00001498                          2407  ;   a1.l = pointer to other rect 
+00001498                          2408  ;
+00001498                          2409  ; Output:
+00001498                          2410  ;   d0.l = 1 if rects are overlapping 
+00001498                          2411  ;          0 otherwise 
+00001498                          2412  ; ------------------------  
+00001498                          2413  Rect_OverlapsRect:
+00001498                          2414  
+00001498                          2415      ; check if this.right < other.left 
+00001498  2028 0000               2416      move.l M_RECT_X(a0), d0 
+0000149C  D0A8 0008               2417      add.l M_RECT_WIDTH(a0), d0 
+000014A0  B0A9 0000               2418      cmp.l M_RECT_X(a1), d0 
+000014A4  6D00 003A               2419      blt .return_false
+000014A8                          2420      
+000014A8                          2421      ; check if this.left > other.right 
+000014A8  2028 0000               2422      move.l M_RECT_X(a0), d0
+000014AC  2229 0000               2423      move.l M_RECT_X(a1), d1 
+000014B0  D2A9 0008               2424      add.l M_RECT_WIDTH(a1), d1 
+000014B4  B081                    2425      cmp.l d1, d0 
+000014B6  6E00 0028               2426      bgt .return_false
+000014BA                          2427      
+000014BA                          2428      ; check if this.bot < other.top 
+000014BA  2028 0004               2429      move.l M_RECT_Y(a0), d0 
+000014BE  D0A8 000C               2430      add.l M_RECT_HEIGHT(a0), d0 
+000014C2  B0A9 0004               2431      cmp.l M_RECT_Y(a1), d0 
+000014C6  6D00 0018               2432      blt .return_false
+000014CA                          2433      
+000014CA                          2434      ; check if this.top > other.bot 
+000014CA  2028 0004               2435      move.l M_RECT_Y(a0), d0 
+000014CE  2229 0004               2436      move.l M_RECT_Y(a1), d1 
+000014D2  D2A9 000C               2437      add.l M_RECT_HEIGHT(a1), d1 
+000014D6  B081                    2438      cmp.l d1, d0
+000014D8  6E00 0006               2439      bgt .return_false
+000014DC                          2440      
+000014DC                          2441      ; fall-through to .return_true
+000014DC                          2442      
+000014DC                          2443  .return_true 
+000014DC  7001                    2444      move.l #1, d0 
+000014DE  4E75                    2445      rts 
+000014E0                          2446  
+000014E0                          2447  .return_false 
+000014E0  7000                    2448      move.l #0, d0 
+000014E2  4E75                    2449      rts
+000014E2  4E75                    2450  -------------------- end include --------------------
+000014E4                          2451      INCLUDE "source/saver.asm"
+000014E4                          2452  ; ++++++ STRUCT ++++++
+000014E4                          2453  ; Saver  
+000014E4                          2454  ;
+000014E4                          2455  ; size  = 32 bytes 
+000014E4                          2456  ; 
+000014E4                          2457  ; 0(Saver)  = x position (24.8 long)
+000014E4                          2458  ; 4(Saver)  = y position (24.8 long)
+000014E4                          2459  ; 8(Saver)  = width (24.8 long)
+000014E4                          2460  ; 12(Saver) = height (24.8 long)
+000014E4                          2461  ; 16(Saver) = x velocity (24.8)
+000014E4                          2462  ; ++++++++++++++++++++
+000014E4  =00000000               2463  M_SAVER_RECT         EQU 0 
+000014E4  =00000000               2464  M_SAVER_X            EQU 0 
+000014E4  =00000004               2465  M_SAVER_Y            EQU 4 
+000014E4  =00000008               2466  M_SAVER_WIDTH        EQU 8 
+000014E4  =0000000C               2467  M_SAVER_HEIGHT       EQU 12 
+000014E4  =00000010               2468  M_SAVER_XVEL         EQU 16 
+000014E4                          2469  
+000014E4                          2470  ; ------ SUBROUTINE ------
+000014E4                          2471  ; Saver_Init
+000014E4                          2472  ;
+000014E4                          2473  ; Initializes a saver struct with 
+000014E4                          2474  ; default stating values.
+000014E4                          2475  ; 
+000014E4                          2476  ; Input:
+000014E4                          2477  ;   a0.l = pointer to saver struct 
+000014E4                          2478  ; ------------------------  
+000014E4                          2479  Saver_Init:
+000014E4                          2480  
+000014E4  217C 00001400 0000      2481      move.l #SAVER_INIT_X, M_SAVER_X(a0)
+000014EC  217C 0000D400 0004      2482      move.l #SAVER_INIT_Y, M_SAVER_Y(a0)
+000014F4  217C 00002000 0008      2483      move.l #SAVER_WIDTH, M_SAVER_WIDTH(a0)
+000014FC  217C 00000800 000C      2484      move.l #SAVER_HEIGHT, M_SAVER_HEIGHT(a0)
+00001504  217C 00000200 0010      2485      move.l #SAVER_XVEL, M_SAVER_XVEL(a0)
+0000150C                          2486  
+0000150C  4E75                    2487      rts 
+0000150E                          2488   
+0000150E                          2489  ; ------ SUBROUTINE ------
+0000150E                          2490  ; Saver_Draw
+0000150E                          2491  ;
+0000150E                          2492  ; Draws the saver at its current location 
+0000150E                          2493  ; 
+0000150E                          2494  ; Input:
+0000150E                          2495  ;   a0.l = pointer to saver struct 
+0000150E                          2496  ; ------------------------   
+0000150E                          2497  Saver_Draw:
+0000150E                          2498  
+0000150E                          2499      ; Example usage of RenderBitmap16
+0000150E  7000                    2500      move.l #0, d0             ; param d0: chunk x coordinate
+00001510  7200                    2501      move.l #0, d1             ; param d1: chunk y coordinate 
+00001512  7420                    2502      move.l #32, d2            ; param d2: chunk width 
+00001514  7610                    2503      move.l #16, d3            ; param d3: chunk height 
+00001516  2828 0000               2504      move.l M_SAVER_X(a0), d4  ; param d4: screen x coordinate
+0000151A  E084                    2505      asr.l #8, d4              ; convert from fixed to int 
+0000151C  2A28 0004               2506      move.l M_SAVER_Y(a0), d5  ; param d5: screen y coordinate 
+00001520  E085                    2507      asr.l #8, d5              ; convert from fixed to int 
+00001522  41F9 0000A3F6           2508      lea SaverBitmap, a0       ; param a0: pointer to bitmap file data
+00001528  4EB8 04A2               2509      jsr RenderBitmap16 
+0000152C                          2510      
+0000152C  4E75                    2511      rts 
+0000152E                          2512      
+0000152E                          2513  ; ------ SUBROUTINE ------
+0000152E                          2514  ; Saver_Hide
+0000152E                          2515  ;
+0000152E                          2516  ; Hides the saver at its current location.
+0000152E                          2517  ; Does this by drawing the background over 
+0000152E                          2518  ; the the saver.
+0000152E                          2519  ; 
+0000152E                          2520  ; Input:
+0000152E                          2521  ;   a0.l = pointer to saver struct 
+0000152E                          2522  ; ------------------------   
+0000152E                          2523  Saver_Hide:
+0000152E                          2524  
+0000152E                          2525      ; Example usage of RenderBitmap16
+0000152E  2028 0000               2526      move.l M_SAVER_X(a0), d0  ; param d0: chunk x coordinate
+00001532  E080                    2527      asr.l #8, d0              ; convert from fixed to int 
+00001534  2228 0004               2528      move.l M_SAVER_Y(a0), d1  ; param d1: chunk y coordinate 
+00001538  E081                    2529      asr.l #8, d1              ; convert from fixed to int 
+0000153A  7420                    2530      move.l #32, d2            ; param d2: chunk width 
+0000153C  7610                    2531      move.l #16, d3            ; param d3: chunk height 
+0000153E  2828 0000               2532      move.l M_SAVER_X(a0), d4  ; param d4: screen x coordinate
+00001542  E084                    2533      asr.l #8, d4              ; convert from fixed to int 
+00001544  2A28 0004               2534      move.l M_SAVER_Y(a0), d5  ; param d5: screen y coordinate 
+00001548  E085                    2535      asr.l #8, d5              ; convert from fixed to int 
+0000154A  41F9 0000A50C           2536      lea BGBitmap, a0          ; param a0: pointer to bitmap file data
+00001550  4EB8 04A2               2537      jsr RenderBitmap16 
+00001554                          2538      
+00001554  4E75                    2539      rts 
+00001556                          2540  
+00001556                          2541  
+00001556                          2542  ; ------ SUBROUTINE ------
+00001556                          2543  ; Saver_Update
+00001556                          2544  ;
+00001556                          2545  ; Moves the saver based on it's x velocity.
+00001556                          2546  ; It the saver hits the edge of the screen then
+00001556                          2547  ; its xvelocity will be reversed. If the saver 
+00001556                          2548  ; overlaps the ball, then it will set state to 
+00001556                          2549  ; STATE_AIM (and thus, not reduce BallCount)
+00001556                          2550  ; 
+00001556                          2551  ; Input:
+00001556                          2552  ;   a0.l = pointer to saver struct 
+00001556                          2553  ; ------------------------   
+00001556                          2554  Saver_Update
+00001556                          2555  
+00001556  2F08                    2556      move.l a0, -(sp)
+00001558  4EB8 152E               2557      jsr Saver_Hide
+0000155C  205F                    2558      move.l (sp)+, a0
+0000155E                          2559      
+0000155E  2028 0010               2560      move.l M_SAVER_XVEL(a0), d0 
+00001562  2228 0000               2561      move.l M_SAVER_X(a0), d1 
+00001566  D280                    2562      add.l d0, d1                ; d1 = updated x position 
+00001568                          2563      
+00001568  0C81 00000000           2564      cmpi.l #SAVER_LEFT_BOUND, d1 
+0000156E  6E00 0010               2565      bgt .check_right 
+00001572                          2566      
+00001572                          2567      ; clamp the position to 0 
+00001572  7200                    2568      move.l #SAVER_LEFT_BOUND, d1
+00001574                          2569      ; reverse the direction of velocity 
+00001574  203C 00000200           2570      move.l #(SAVER_XVEL), d0    
+0000157A                          2571      
+0000157A  4EF9 00001596           2572      jmp .update_properties
+00001580                          2573      
+00001580                          2574  .check_right
+00001580                          2575  
+00001580  0C81 00012000           2576      cmpi.l #SAVER_RIGHT_BOUND, d1 
+00001586  6D00 000E               2577      blt .update_properties
+0000158A                          2578      
+0000158A                          2579      ; clamp the position to 0 
+0000158A  223C 00012000           2580      move.l #SAVER_RIGHT_BOUND, d1
+00001590                          2581      ; reverse the direction of velocity 
+00001590  203C FFFFFE00           2582      move.l #(-SAVER_XVEL), d0    
+00001596                          2583      ; jmp .update_properties
+00001596                          2584      
+00001596                          2585  .update_properties
+00001596  2140 0010               2586      move.l d0, M_SAVER_XVEL(a0)
+0000159A  2141 0000               2587      move.l d1, M_SAVER_X(a0)
+0000159E                          2588      
+0000159E                          2589      ; Update the sprite to match the x/y pos
+0000159E  2F08                    2590      move.l a0, -(sp)
+000015A0  4EB8 150E               2591      jsr Saver_Draw
+000015A4  205F                    2592      move.l (sp)+, a0 
+000015A6                          2593  
+000015A6                          2594      ; Lastly, check to see if the ball is overlapping this saver.
+000015A6                          2595      ; If so, set state to aim
+000015A6  43F8 03C6               2596      lea Ball, a1 
+000015AA  4EB8 1498               2597      jsr Rect_OverlapsRect
+000015AE  4A80                    2598      tst.l d0 
+000015B0  6700 000A               2599      beq .return 
+000015B4                          2600      
+000015B4                          2601      ; Change the sate to Aim state to spare a ball.
+000015B4  21FC 00000001 040A      2602      move.l #STATE_AIM, GameState
+000015BC                          2603      
+000015BC                          2604  .return 
+000015BC  4E75                    2605      rts
+000015BE                          2606      
+000015BE                          2607  -------------------- end include --------------------
+000015BE                          2608      
+000015BE                          2609      ; TILE includes 
+000015BE                          2610      ORG (*+1)&-2
+000015BE                          2611  TitleBitmap:
+000015BE                          2612      INCBIN "bitmaps/title.bmp"
+0000A234                          2613  RedPegBitmap:
+0000A234                          2614      INCBIN "bitmaps/red_peg.bmp"
+0000A2CA                          2615  BluePegBitmap:
+0000A2CA                          2616      INCBIN "bitmaps/blue_peg.bmp"
+0000A360                          2617  BallBitmap:
+0000A360                          2618      INCBIN "bitmaps/green_peg.bmp"
+0000A3F6                          2619  SaverBitmap:
+0000A3F6                          2620      INCBIN "bitmaps/saver.bmp"
+0000A50C                          2621  BGBitmap:
+0000A50C                          2622      INCBIN "bitmaps/background.bmp"
+00013182                          2623      
+00013182                          2624      ; Level includes 
+00013182                          2625      ORG (*+1)&-2 
+00013182                          2626      INCLUDE "levels/level0.asm"
+00013182                          2627  Level0Data:
+00013182= 0000000E                2628      dc.l 14         ; num pegs 
+00013186= 00000001                2629      dc.l 1          ; num red pegs
+0001318A= 00000006                2630      dc.l 6          ; stating ball count 
+0001318E= 0008 0050               2631      dc.w 8, 80 
+00013192= 0018 0038               2632      dc.w 24, 56 
+00013196= 0030 00A8               2633      dc.w 48, 168 
+0001319A= 0048 0070               2634      dc.w 72, 112
+0001319E= 0058 00A8               2635      dc.w 88, 168 
+000131A2= 0070 0070               2636      dc.w 112, 112 
+000131A6= 0088 0048               2637      dc.w 136, 72
+000131AA= 00B0 0048               2638      dc.w 176, 72 
+000131AE= 00C8 0070               2639      dc.w 200, 112 
+000131B2= 00E0 00A8               2640      dc.w 224, 168 
+000131B6= 00F0 0070               2641      dc.w 240, 112 
+000131BA= 0108 00A8               2642      dc.w 264, 168 
+000131BE= 0120 0038               2643      dc.w 288, 56 
+000131C2= 0130 0050               2644      dc.w 304, 80
+000131C6                          2645      
+000131C6                          2646  -------------------- end include --------------------
+000131C6                          2647      INCLUDE "levels/level1.asm"
+000131C6                          2648  Level1Data:
+000131C6= 0000001D                2649      dc.l 29         ; num pegs 
+000131CA= 00000008                2650      dc.l 8          ; num red pegs
+000131CE= 00000007                2651      dc.l 7          ; stating ball count 
+000131D2= 0018 0038               2652      dc.w 24, 56 
+000131D6= 0010 0048               2653      dc.w 16, 72 
+000131DA= 0008 0058               2654      dc.w 8, 88 
+000131DE= 0008 0068               2655      dc.w 8, 104
+000131E2= 0010 0078               2656      dc.w 16, 120
+000131E6= 0018 0088               2657      dc.w 24, 136
+000131EA= 0028 0090               2658      dc.w 40, 144 
+000131EE= 0038 0090               2659      dc.w 56, 144 
+000131F2= 0048 0090               2660      dc.w 72, 144 
+000131F6= 0040 0050               2661      dc.w 64, 80 
+000131FA= 0050 0040               2662      dc.w 80, 64 
+000131FE= 0060 0050               2663      dc.w 96, 80 
+00013202= 0070 00B0               2664      dc.w 112, 176 
+00013206= 0090 0068               2665      dc.w 144, 104 
+0001320A= 009C 0078               2666      dc.w 156, 120 
+0001320E= 00A8 0068               2667      dc.w 168, 104 
+00013212= 00D0 00B0               2668      dc.w 208, 176 
+00013216= 00D8 0050               2669      dc.w 216, 80 
+0001321A= 00E8 0040               2670      dc.w 232, 64 
+0001321E= 00F8 0050               2671      dc.w 248, 80 
+00013222= 00F0 0090               2672      dc.w 240, 144 
+00013226= 0100 0090               2673      dc.w 256, 144 
+0001322A= 0110 0090               2674      dc.w 272, 144 
+0001322E= 0120 0088               2675      dc.w 288, 136 
+00013232= 0128 0078               2676      dc.w 296, 120 
+00013236= 0130 0068               2677      dc.w 304, 104 
+0001323A= 0130 0058               2678      dc.w 304, 88 
+0001323E= 0128 0048               2679      dc.w 296, 72 
+00013242= 0120 0038               2680      dc.w 288, 56 
+00013246                          2681      
+00013246                          2682  -------------------- end include --------------------
+00013246                          2683      INCLUDE "levels/levels.asm"    
+00013246                          2684  LevelData:
+00013246= 00013182                2685      dc.l Level0Data 
+0001324A= 000131C6                2686      dc.l Level1Data 
+0001324E= 00013182                2687      dc.l Level0Data 
+00013252= 000131C6                2688      dc.l Level1Data 
+00013256= 00013182                2689      dc.l Level0Data 
+0001325A= 000131C6                2690      dc.l Level1Data 
+0001325E= 00013182                2691      dc.l Level0Data 
+00013262= 000131C6                2692      dc.l Level1Data 
+00013262= 000131C6                2693  -------------------- end include --------------------
+00013266                          2694      
+00013266                          2695  
+00013266                          2696  EntryPoint:
+00013266                          2697      
+00013266                          2698      ; Set up the stack pointer 
+00013266  2E7C 00000000           2699      move.l #$00000000, sp
+0001326C                          2700      
+0001326C  4EB8 070A               2701      jsr LoadStart
+00013270  21FC 00000000 040A      2702      move.l #STATE_START, GameState
+00013278                          2703      
+00013278                          2704  Main_Loop:
+00013278                          2705  
+00013278                          2706      ;jsr WaitVblank
+00013278  4EB8 045E               2707      jsr UpdateButtons
+0001327C                          2708      
+0001327C  2038 040A               2709      move.l GameState, d0 
+00013280  0C80 00000000           2710      cmpi.l #STATE_START, d0 
+00013286  6600 000C               2711      bne .check_aim
+0001328A  4EB8 072A               2712      jsr UpdateStart
+0001328E  4EF9 00013278           2713      jmp Main_Loop
+00013294                          2714  
+00013294                          2715  .check_aim
+00013294  0C80 00000001           2716      cmpi.l #STATE_AIM, d0 
+0001329A  6600 000C               2717      bne .check_resolve 
+0001329E  4EB8 0898               2718      jsr UpdateAim
+000132A2  4EF9 00013278           2719      jmp Main_Loop
+000132A8                          2720      
+000132A8                          2721  .check_resolve
+000132A8  0C80 00000002           2722      cmpi.l #STATE_RESOLVE, d0 
+000132AE  6600 000C               2723      bne .check_lose 
+000132B2  4EB8 09B4               2724      jsr UpdateResolve 
+000132B6  4EF9 00013278           2725      jmp Main_Loop
+000132BC                          2726      
+000132BC                          2727  .check_lose 
+000132BC  0C80 00000003           2728      cmpi.l #STATE_LOSE, d0 
+000132C2  6600 0010               2729      bne .check_win 
+000132C6  21FC 00000000 040A      2730      move.l #STATE_START, GameState
+000132CE  4EF9 00013278           2731      jmp Main_Loop
+000132D4                          2732      
+000132D4                          2733  .check_win
+000132D4                          2734      
+000132D4  4EF9 00013278           2735      jmp Main_Loop        ; go to next iteration of game loop
+000132DA                          2736      
+000132DA                          2737      END    START        ; last line of source
+
+No errors detected
+No warnings generated
+
+
+SYMBOL TABLE INFORMATION
+Symbol-name         Value
+-------------------------
+AIMANGLE            412
+AIM_ANGLE_DELTA     200
+AIM_ANGLE_MAX       AF00
+AIM_ANGLE_MIN       500
+AIM_CENTER_X        9A00
+AIM_CENTER_Y        500
+AIM_RADIUS          1E00
+AIM_START_ANGLE     5A00
+BALL                3C6
+BALLBITMAP          A360
+BALLCOUNT           41A
+BALLS_STRING_X      1
+BALLS_STRING_Y      0
+BALL_DATA_SIZE      20
+BALL_DRAW           1242
+BALL_HEIGHT         800
+BALL_HIDE           1262
+BALL_INIT           118E
+BALL_PATTERN        43
+BALL_SIZE_SHIFT     5
+BALL_SPRITE_INDEX   0
+BALL_UPDATE         11C0
+BALL_UPDATE:BOUNCE_LEFT  1210
+BALL_UPDATE:BOUNCE_RIGHT  121E
+BALL_UPDATE:CHECK_COLLISIONS  1230
+BALL_UPDATE:REVERSE_XVEL  1226
+BALL_UPDATE:UPDATE_SPRITE  123A
+BALL_WIDTH          800
+BGBITMAP            A50C
+BITMAP_ADDR         69A
+BITMAP_BPP          6E2
+BITMAP_BPP_OFFSET   1C
+BITMAP_HEADER_SIZE  36
+BITMAP_HEIGHT       6DA
+BITMAP_HEIGHT_OFFSET  16
+BITMAP_PIXEL_ARRAY_OFF_OFFSET  A
+BITMAP_WIDTH        6D2
+BITMAP_WIDTH_BYTES  6F6
+BITMAP_WIDTH_OFFSET  12
+BLUEPEGBITMAP       A2CA
+BLUE_PEG_HIGH_SCORE  1
+BLUE_PEG_LOW_SCORE  4
+BLUE_PEG_MID_SCORE  2
+BUTTONSDOWN         406
+BUTTON_A            C
+BUTTON_B            4
+BUTTON_C            5
+BUTTON_DOWN         1
+BUTTON_LEFT         2
+BUTTON_RIGHT        3
+BUTTON_START        D
+BUTTON_UP           0
+CHUNK_HEIGHT        6BA
+CHUNK_WIDTH         6B2
+CHUNK_X             6A2
+CHUNK_Y             6AA
+CLEARPEGS           A36
+COLOR_TABLE_ADDR    6E6
+COSTABLE            DBA
+DAMPENING_COEFFICIENT  E0
+DRAWBACKGROUND      AC8
+DRAWBALLCOUNT       AC6
+DRAWSCORE           A86
+ENDIANSWAP_L        6FE
+ENDIANSWAP_W        706
+ENTRYPOINT          13266
+FALLOUT_Y           E000
+FRAMECOUNTER        42E
+GAMESTATE           40A
+GRAVITY             12
+HIGH_RED            20
+IO_TASK_DRAW_PIXEL  52
+IO_TASK_PEN_COLOR   50
+KEYBOARD_INPUT_TRAP_CODE  13
+KEY_LIST            25275A0D
+LAUNCH_SPEED        400
+LEFT_BOUND          0
+LEVEL               416
+LEVEL0DATA          13182
+LEVEL1DATA          131C6
+LEVELBALLCOUNT      426
+LEVELDATA           13246
+LEVELPEGCOUNT       41E
+LEVELREDPEGCOUNT    422
+LEVEL_BALL_COUNT_OFFSET  8
+LEVEL_PEGS_OFFSET   C
+LEVEL_PEG_COUNT_OFFSET  0
+LEVEL_RED_PEG_COUNT_OFFSET  4
+LOADGAME            760
+LOADLEVEL           798
+LOADLEVEL:FIND_BLUE_LOOP  856
+LOADLEVEL:FOUND_BLUE  878
+LOADLEVEL:LOAD_PEGS  7B6
+LOADLEVEL:PEG_LOOP  7F4
+LOADLEVEL:RED_PEG_LOOP  838
+LOADLEVEL:SET_RED_PEGS  830
+LOADSTART           70A
+LOW_RED             2
+LVARS_SIZE          6
+LVARS_SIZE:LOOP     A46
+LVARS_SIZE:RETURN   A82
+L_COUNTER           4
+L_CUR_PEG           0
+L_DIGIT1            4
+L_DIGIT2            2
+L_DIGIT3            0
+MAIN_LOOP           13278
+MAIN_LOOP:CHECK_AIM  13294
+MAIN_LOOP:CHECK_LOSE  132BC
+MAIN_LOOP:CHECK_RESOLVE  132A8
+MAIN_LOOP:CHECK_WIN  132D4
+MAX_GENGGLE_SPRITES  20
+MAX_PEGS            1E
+MAX_SQRT_INPUT      80
+MID_RED             6
+M_BALL_HEIGHT       C
+M_BALL_RECT         0
+M_BALL_WIDTH        8
+M_BALL_X            0
+M_BALL_XVEL         10
+M_BALL_Y            4
+M_BALL_YVEL         14
+M_PEG_ACTIVE        11
+M_PEG_HEIGHT        C
+M_PEG_LEFT_BOUND    14
+M_PEG_MOVING        12
+M_PEG_RECT          0
+M_PEG_RIGHT_BOUND   16
+M_PEG_SPRITE_INDEX  13
+M_PEG_TYPE          10
+M_PEG_WIDTH         8
+M_PEG_X             0
+M_PEG_Y             4
+M_RECT_HEIGHT       C
+M_RECT_WIDTH        8
+M_RECT_X            0
+M_RECT_Y            4
+M_SAVER_HEIGHT      C
+M_SAVER_RECT        0
+M_SAVER_WIDTH       8
+M_SAVER_X           0
+M_SAVER_XVEL        10
+M_SAVER_Y           4
+NUM_LEVELS          8
+PEGCOUNT            436
+PEGS                6
+PEGS_SPRITE_INDEX   2
+PEG_CONSUME         1412
+PEG_CONSUME:BLUE_PEG  1440
+PEG_CONSUME:NOT_LOW  1458
+PEG_CONSUME:NOT_MID  146C
+PEG_CONSUME:RETURN  1470
+PEG_DATA_SIZE       20
+PEG_DRAW            13B2
+PEG_DRAW:BLUE_PEG   13DE
+PEG_DRAW:RENDER     13E4
+PEG_HEIGHT          800
+PEG_HIDE            13EA
+PEG_INIT            136C
+PEG_INIT_X          FFFF9400
+PEG_INIT_Y          FFFF9400
+PEG_PALETTE         1
+PEG_SIZE_SHIFT      5
+PEG_TYPE_BLUE       0
+PEG_TYPE_PURPLE     2
+PEG_TYPE_RED        1
+PEG_WIDTH           800
+PIXEL_ARRAY_ADDR    6EE
+RANDOM              444
+RANDVAL             42A
+RAND_ADDER          929
+RAND_MULTIPLIER     1A1
+RECT_INIT           1476
+RECT_OVERLAPSRECT   1498
+RECT_OVERLAPSRECT:RETURN_FALSE  14E0
+RECT_OVERLAPSRECT:RETURN_TRUE  14DC
+REDPEGBITMAP        A234
+REDPEGCOUNT         432
+RED_PEG_SCORE       2
+REGS                301
+REGS:CONTINUE       135A
+REGS:LOOP           1290
+REGS:NO_VEL_CLAMP   12EC
+REGS:SKIP_MAG_CLAMP  1322
+RENDERBITMAP16      4A2
+RENDERBITMAP16:CLAMP_CHUNK_H  5A4
+RENDERBITMAP16:FLIP_CHUNK_Y  5CE
+RENDERBITMAP16:LOOP_END  67E
+RENDERBITMAP16:LOOP_EVEN  62C
+RENDERBITMAP16:LOOP_ODD  656
+RENDERBITMAP16:LOOP_START  61C
+RENDERBITMAP16:RETURN  698
+RENDER_X            6C2
+RENDER_Y            6CA
+REQUIRED_BITS_PER_PIXEL  4
+RIGHT_BOUND         13800
+SAVER               3E6
+SAVERBITMAP         A3F6
+SAVER_DATA_SIZE     20
+SAVER_DRAW          150E
+SAVER_HEIGHT        800
+SAVER_HIDE          152E
+SAVER_INIT          14E4
+SAVER_INIT_X        1400
+SAVER_INIT_Y        D400
+SAVER_LEFT_BOUND    0
+SAVER_RECT_OFFSET_X  0
+SAVER_RECT_OFFSET_Y  8
+SAVER_RIGHT_BOUND   12000
+SAVER_SIZE_SHIFT    5
+SAVER_SPRITE_INDEX  1
+SAVER_UPDATE        1556
+SAVER_UPDATE:CHECK_RIGHT  1580
+SAVER_UPDATE:RETURN  15BC
+SAVER_UPDATE:UPDATE_PROPERTIES  1596
+SAVER_WIDTH         2000
+SAVER_XVEL          200
+SAVE_STRING_X       2
+SAVE_STRING_Y       2
+SCORE               43A
+SCORE_STRING_X      1D
+SCORE_STRING_Y      0
+SCREEN_HEIGHT       E0
+SCREEN_WIDTH        140
+SEEDRANDOM          43E
+SETRANDSEED         756
+SINTABLE            AEA
+SPRITE_DISABLE_X    14
+SPRITE_DISABLE_Y    14
+SQRTTABLE           108A
+START               0
+STATE_AIM           1
+STATE_LOSE          3
+STATE_RESOLVE       2
+STATE_START         0
+STATE_WIN           4
+TITLEBITMAP         15BE
+TO_FIXED            100
+UPDATEAIM           898
+UPDATEAIM:CHECK_CLAMP_MAX  8D8
+UPDATEAIM:CHECK_RIGHT  8B4
+UPDATEAIM:CLAMP_AIM_ANGLE  8C2
+UPDATEAIM:RETURN    902
+UPDATEAIM:SAVE_AIM_ANGLE  8E8
+UPDATEBUTTONS       45E
+UPDATEBUTTONS:CHECK_RIGHT  478
+UPDATEBUTTONS:CHECK_START  490
+UPDATEBUTTONS:CHECK_Z  484
+UPDATEBUTTONS:SAVE_KEYS  49C
+UPDATERESOLVE       9B4
+UPDATERESOLVE:CHECK_FALLOUT  9EC
+UPDATERESOLVE:RETURN  A34
+UPDATERESOLVE:SET_STATE_AIM  A2C
+UPDATESTART         72A
+UPDATESTART:RETURN  754
+VBLANKFLAG          40E
+_BALL_CHECKPEGCOLLISIONS  128A
+_CHECKLAUNCH        95C
+_CHECKLAUNCH:RETURN  9B2
+_POSITIONBALL       904
+_POSITIONBALL:RETURN  95A
