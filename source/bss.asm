@@ -37,3 +37,9 @@ PegCount:
     ds.l 1
 Score:
     ds.l 1
+PrevDown:
+    ds.l 1 
+PrevTime:
+    ds.l 1 
+CurTime:
+    ds.l 1 

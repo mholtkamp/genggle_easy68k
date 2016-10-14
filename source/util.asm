@@ -59,6 +59,11 @@ Random:
 ; If cleared, then that button is up.
 ; ------------------------
 UpdateButtons:
+
+    ; Save previous button states so you can 
+    ; easily tell if a button was just pressed this frame.
+    move.w ButtonsDown, PrevDown 
+    
 	clr.l d0 
 	move.l #KEY_LIST, d1 
     move.l #KEYBOARD_INPUT_TRAP_CODE, d0 

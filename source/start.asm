@@ -34,6 +34,9 @@ UpdateStart:
 	; Check if the start button is down.
 	; If so, transition to game
 	move.w ButtonsDown, d0 
+    move.w PrevDown, d1 
+    not.w d1 
+    or.w d1, d0 
 	btst #BUTTON_START, d0
 	bne .return 
     jsr SetRandSeed

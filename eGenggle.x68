@@ -44,6 +44,10 @@ SaverBitmap:
 	INCBIN "bitmaps/saver.bmp"
 BGBitmap:
     INCBIN "bitmaps/background.bmp"
+LoseBitmap:
+    INCBIN "bitmaps/lose.bmp"
+WinBitmap:
+    INCBIN "bitmaps/win.bmp"
 	
 	; Level includes 
 	ORG (*+1)&-2 
@@ -61,11 +65,18 @@ EntryPoint:
     move.l #DRAW_MODE_DOUBLE_BUFFERED, d1 
     move.l #DRAW_MODE_TRAP_CODE, d0 
     trap #15
+    
+    ; Initialize the starting time
+    move.l #TIME_TRAP_CODE, d0 
+    trap #15 
+    move.l d1, CurTime
 	
 	jsr LoadStart
 	move.l #STATE_START, GameState
 	
 Main_Loop:
+
+    jsr WaitForFrame
 
 	; Swap buffers 
 	move.l #SWAP_BUFFERS_TRAP_CODE, d0 
@@ -94,15 +105,45 @@ Main_Loop:
 .check_lose 
 	cmpi.l #STATE_LOSE, d0 
 	bne .check_win 
-	move.l #STATE_START, GameState
+	jsr UpdateLoseWin
 	jmp Main_Loop
 	
 .check_win
+    cmpi.l #STATE_WIN, d0 
+    bne .error_state 
+    jsr UpdateLoseWin 
+    jmp Main_Loop
+    
+.error_state 
 	
-	jmp Main_Loop        ; go to next iteration of game loop
+	jmp Main_Loop      ; Hopefully never get to this point 
+	
+	
+	
+WaitForFrame:
+    
+    move.l CurTime, d1 
+    add.l #FRAME_TIME, d1 
+    move.l d1, d2 
+    
+.wait_loop
+    
+    ; Get the current time 
+    move.l #TIME_TRAP_CODE, d0 
+    trap #15 
+    
+    cmp.l d1, d2 
+    bge .wait_loop 
+    
+    ; Reco
+    move.l d1, CurTime 
+
+    rts 
     
     END    START        ; last line of source
 	
+
+
 
 
 

@@ -271,6 +271,9 @@ _PositionBall:
 _CheckLaunch:
 
 	move.w ButtonsDown, d0 
+    move.w PrevDown, d1 
+    not.w d1 
+    or.w d1, d0 
 	btst #BUTTON_A, d0 
 	bne .return 
 	
@@ -337,8 +340,18 @@ UpdateResolve:
     move.l RedPegCount, d0 
     cmpi.l #0, d0 
     bne .check_fallout
-    ; increment level and call load level again
+
+    ; increment level and check if that was the last level 
     addq.l #1, Level 
+    cmpi.l #NUM_LEVELS, Level 
+    bne .load_next_level
+    
+    ; That was the last level, so switch to the win state 
+    move.l #STATE_WIN, GameState
+    jsr LoadWin 
+    jmp .return 
+    
+.load_next_level
     jsr LoadLevel 
     move.l #STATE_AIM, GameState
     jmp .return 
@@ -359,7 +372,7 @@ UpdateResolve:
 	cmpi.l #0, BallCount 
 	bne .set_state_aim
 	move.l #STATE_LOSE, GameState
-	jsr LoadStart
+	jsr LoadLose
 	jmp .return 
 .set_state_aim 
 	move.l #STATE_AIM, GameState
@@ -528,4 +541,71 @@ ClipView:
     move.l #DRAW_RECT_TRAP_CODE, d0 
     trap #15 
 
+    rts 
+    
+    
+; ------ SUBROUTINE ------
+; LoadLose 
+; 
+; Loads the lose state. Draws the 
+; "LOSE" text on screen.
+; ------------------------	
+LoadLose:
+
+LOSE_X EQU 145
+LOSE_Y EQU 100
+LOSE_WIDTH EQU 300 
+LOSE_HEIGHT EQU 300
+    
+    move.l #0, d0             ; param d0: chunk x coordinate
+    move.l #0, d1             ; param d1: chunk y coordinate 
+    move.l #LOSE_WIDTH, d2            ; param d2: chunk width 
+    move.l #LOSE_HEIGHT, d3            ; param d3: chunk height 
+    move.l #LOSE_Y, d4             ; param d4: screen x coordinate
+    move.l #LOSE_X, d5             ; param d5: screen y coordinate 
+    lea LoseBitmap, a0       ; param a0: pointer to bitmap file data
+    jsr RenderBitmap16 
+    rts 
+    
+; ------ SUBROUTINE ------
+; LoadWin 
+; 
+; Loads the win state. Draws the 
+; "WIN" text on screen.
+; ------------------------	
+LoadWin:
+
+WIN_X EQU 145
+WIN_Y EQU 100
+WIN_WIDTH EQU 300 
+WIN_HEIGHT EQU 300
+    
+    move.l #0, d0             ; param d0: chunk x coordinate
+    move.l #0, d1             ; param d1: chunk y coordinate 
+    move.l #WIN_WIDTH, d2            ; param d2: chunk width 
+    move.l #WIN_HEIGHT, d3            ; param d3: chunk height 
+    move.l #WIN_X, d4             ; param d4: screen x coordinate
+    move.l #WIN_Y, d5             ; param d5: screen y coordinate 
+    lea WinBitmap, a0       ; param a0: pointer to bitmap file data
+    jsr RenderBitmap16 
+    
+    rts 
+    
+
+; ------ SUBROUTINE ------
+; UpdateLoseWin 
+; 
+; Will check if user is hitting START. If so, then  
+; will reset to the start state.
+; ------------------------	    
+UpdateLoseWin:
+
+    move.w ButtonsDown, d0 
+    btst #BUTTON_START, d0 
+    bne .return 
+    
+    move.l #STATE_START, GameState
+    jsr LoadStart 
+    
+.return 
     rts 
