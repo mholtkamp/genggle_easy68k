@@ -56,13 +56,21 @@ EntryPoint:
     
     ; Set up the stack pointer 
     move.l #$00000000, sp
+    
+    ; Enable the double buffered draw mode 
+    move.l #DRAW_MODE_DOUBLE_BUFFERED, d1 
+    move.l #DRAW_MODE_TRAP_CODE, d0 
+    trap #15
 	
 	jsr LoadStart
 	move.l #STATE_START, GameState
 	
 Main_Loop:
 
-	;jsr WaitVblank
+	; Swap buffers 
+	move.l #SWAP_BUFFERS_TRAP_CODE, d0 
+	trap #15 
+	
 	jsr UpdateButtons
 	
 	move.l GameState, d0 
@@ -95,6 +103,7 @@ Main_Loop:
     
     END    START        ; last line of source
 	
+
 
 
 

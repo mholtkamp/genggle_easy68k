@@ -15,9 +15,6 @@ LoadGame:
     ; Initialize saver 
     lea Saver, a0 
     jsr Saver_Init
-    
-    ;Draw background 
-    jsr DrawBackground 
 	
     move.l #0, Level
 	jsr LoadLevel
@@ -35,7 +32,11 @@ LoadGame:
 ; Level global variable.
 ; ------------------------	
 LoadLevel:
-
+    
+    ; First draw the background that all other 
+    ; objects will be drawn on top of
+    jsr DrawBackground 
+    
 	; Reset aim angle 
 	move.l #AIM_START_ANGLE, AimAngle 
 	
@@ -201,6 +202,8 @@ UpdateAim:
     jsr Saver_Update 
 
 .return 
+
+    jsr ClipView
 	rts 
 	
 ; ------ SUBROUTINE ------
@@ -362,6 +365,7 @@ UpdateResolve:
 	move.l #STATE_AIM, GameState
 	
 .return 
+    jsr ClipView
 	rts
     
 ; ------ SUBROUTINE ------
@@ -491,4 +495,37 @@ DrawBackground:
     jsr RenderBitmap16 
     rts 
     
+    rts 
+    
+; ------ SUBROUTINE ------
+; ClipView
+;
+; Draws two black rectangles outside of the 
+; game space to hide any pixels that render 
+; outside the gamespace.
+; ------------------------	
+ClipView:
+
+    move.l #PEN_COLOR_TRAP_CODE, d0 
+    move.l #$000000, d1              ; set pen color to black 
+    trap #15 
+    
+    move.l #FILL_COLOR_TRAP_CODE, d0 
+    move.l #$000000, d1             ; set fill color to black 
+    trap #15 
+    
+    move.l #0, d1 
+    move.l #224, d2 
+    move.l #640, d3 
+    move.l #480, d4 
+    move.l #DRAW_RECT_TRAP_CODE, d0 
+    trap #15 
+    
+    move.l #320, d1 
+    move.l #0, d2 
+    move.l #640, d3 
+    move.l #480, d4 
+    move.l #DRAW_RECT_TRAP_CODE, d0 
+    trap #15 
+
     rts 

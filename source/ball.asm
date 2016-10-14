@@ -74,7 +74,7 @@ Ball_Update:
 	blt .bounce_left
 	cmpi.l #RIGHT_BOUND, d0 
 	bgt .bounce_right
-	jmp .check_collisions 
+	jmp .check_hit_top 
 	
 .bounce_left
 	move.l #LEFT_BOUND, M_BALL_X(a0)
@@ -82,12 +82,21 @@ Ball_Update:
 	
 .bounce_right 
 	move.l #RIGHT_BOUND, M_BALL_X(a0)
-	; jmp .reverse_xvel
 
 .reverse_xvel
 	move.l M_BALL_XVEL(a0), d0 
 	neg.l d0 
 	move.l d0, M_BALL_XVEL(a0)
+    
+.check_hit_top
+    ; Check if ball goes past upper bounds 
+    move.l M_BALL_Y(a0), d0 
+    cmpi.l #0, d0 
+    bge .check_collisions
+    
+    ; ball hit the top. Reverse y vel 
+    move.l #0, M_BALL_Y(a0)
+    neg.l M_BALL_YVEL(a0)
     
 .check_collisions
     ; Lastly, check for any peg collisions 
