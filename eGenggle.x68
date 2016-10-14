@@ -54,6 +54,62 @@ WinBitmap:
 	INCLUDE "levels/level0.asm"
     INCLUDE "levels/level1.asm"
 	INCLUDE "levels/levels.asm"    
+	
+SegmentsLitTable:
+    dc.b $3f
+    dc.b $03 
+    dc.b $6D
+    dc.b $67
+    dc.b $53 
+    dc.b $76
+    dc.b $7E
+    dc.b $23 
+    dc.b $7F 
+    dc.b $73 
+    
+SegmentsPosTable:
+    ; seg a 
+    dc.w 400
+    dc.w 100
+    dc.w 400
+    dc.w 150
+
+    ; seg b 
+    dc.w 400
+    dc.w 150 
+    dc.w 400
+    dc.w 200 
+
+    ; seg c 
+    dc.w 400 
+    dc.w 200
+    dc.w 360 
+    dc.w 200
+
+    ; seg d 
+    dc.w 360
+    dc.w 200
+    dc.w 360 
+    dc.w 150 
+
+    ; seg e 
+    dc.w 360
+    dc.w 150 
+    dc.w 360 
+    dc.w 100 
+
+    ; seg f 
+    dc.w 360
+    dc.w 100
+    dc.w 400
+    dc.w 100 
+
+    ; seg g 
+    dc.w 360
+    dc.w 150
+    dc.w 400
+    dc.w 150
+
     
 
 EntryPoint:
@@ -94,12 +150,14 @@ Main_Loop:
 	cmpi.l #STATE_AIM, d0 
 	bne .check_resolve 
 	jsr UpdateAim
+	jsr DrawSevenSeg
 	jmp Main_Loop
 	
 .check_resolve
 	cmpi.l #STATE_RESOLVE, d0 
 	bne .check_lose 
 	jsr UpdateResolve 
+	jsr DrawSevenSeg
 	jmp Main_Loop
 	
 .check_lose 
@@ -140,8 +198,67 @@ WaitForFrame:
 
     rts 
     
+
+
+    
+DrawSevenSeg:
+
+    ; Clear prev display 
+    ;move.l #$000000, d1 
+    ;move.l #PEN_COLOR_TRAP_CODE, d0 
+    ;trap #15
+    ;move.l #$000000, d1 
+    ;move.l #FILL_COLOR_TRAP_CODE, d0 
+    ;trap #15
+    
+
+    ; Set pen color to white 
+    move.l #$ffffff, d1 
+    move.l #PEN_COLOR_TRAP_CODE, d0 
+    trap #15 
+    
+    move.l BallCount, d7
+    move.l #7, d6               ; d6 = 7 = times to loop
+    clr.l d5                    ; d5 holds the offset into seg pos table 
+    lea SegmentsPosTable, a0 
+    
+    ; Which leds are being used?
+    lea SegmentsLitTable, a1 
+    adda.l d7, a1               ; add the ball count to table to get addr of index we want to render
+    clr.l d2 
+    move.b (a1), d7             ; d7 holds the lit bitfield. We dont need ball count any more.
+    
+.loop 
+    btst.l #0, d7
+    beq .continue 
+    
+    ; This bit was 1. So draw a line!
+    lea SegmentsPosTable, a0 
+    adda.l d5, a0 
+    move.w (a0)+, d1 
+    move.w (a0)+, d2 
+    move.w (a0)+, d3 
+    move.w (a0)+, d4 
+    
+    move.l #DRAW_LINE_TRAP_CODE, d0 
+    trap #15 
+    
+.continue
+
+    ; shift lit bitfield 1 
+    lsr.l #1, d7 
+    addi.l #8, d5       ; move offset into pos table by 8 bytes (4 words)
+    subq.l #1, d6
+    bne .loop 
+    
+    rts 
+    
+ 
+    
     END    START        ; last line of source
 	
+
+
 
 
 
